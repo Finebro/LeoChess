@@ -12,3 +12,10 @@ def open_page(p, width=390, height=900):
     br = p.chromium.launch(); pg = br.new_page(viewport={'width': width, 'height': height})
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto(PAGE); return br, pg, errs
+
+def pick(pg, sec, ln):
+    """Chooses a line in the library: opens the sheet on narrow screens, picks the section and the line."""
+    if not pg.is_visible('#chips'):
+        pg.click('#lineBar'); pg.wait_for_selector('#lib.open #chips', state='visible')
+    pg.click(f'#tabs .tab[data-i="{sec}"]'); pg.click(f'#chips .chip[data-i="{ln}"]')
+    pg.wait_for_function('!document.querySelector(".sheet.open")'); pg.wait_for_timeout(350)  # let the sheet slide away

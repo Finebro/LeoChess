@@ -1,14 +1,13 @@
 """Solves every middlegame task (mode «Мітельшпіль») for all lines that have one."""
 from playwright.sync_api import sync_playwright
-from conftest_helpers import DATA, open_page
+from conftest_helpers import DATA, open_page, pick
 
 with sync_playwright() as p:
     br, pg, errs = open_page(p)
     for oi, o in enumerate(DATA):
-        pg.click(f'#tabs .tab[data-i="{oi}"]')
         for li, l in enumerate(o['lines']):
             if 'mg' not in l: continue
-            pg.click(f'#chips .chip[data-i="{li}"]'); pg.click('#mode button[data-m="mg"]')
+            pick(pg, oi, li); pg.click('#mode button[data-m="mg"]')
             M = l['mg']
             for i, k in enumerate(M['kind']):
                 if k != 't': continue

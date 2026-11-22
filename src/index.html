@@ -2,80 +2,153 @@
 <html lang="uk">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191714" media="(prefers-color-scheme: dark)">
 <title>LeoChess — шаховий тренажер</title>
 <style>/* @@STYLES@@ */</style>
 </head>
 <body>
-<div class="wrap">
-  <h1>♞ LeoChess <span class="tagline">шаховий тренажер</span></h1>
-  <div class="style">
-    <label>Фігури <select id="selPieces"><option value="classic">Класичні</option><option value="leo">Леопард</option><option value="gems">Самоцвіти</option><option value="fox">Лисиці</option><option value="lynx">Рись</option><option value="panda">Панди</option><option value="wolf">Вовки</option></select></label>
-    <label>Тренер <select id="selCoach"><option value="on">Леопард</option><option value="off">Вимк.</option></select></label>
-    <label>Дошка <select id="selBoard"><option value="wood">Дерево</option><option value="savanna">Савана</option><option value="green">Зелена</option><option value="blue">Сіро-блакитна</option><option value="pearl">Перлова</option><option value="forest">Осінній ліс</option><option value="night">Нічний ліс</option><option value="taiga">Тайга</option><option value="bamboo">Бамбук</option></select></label>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-first" viewBox="0 0 24 24"><path d="M6 5v14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M19 6.2v11.6a.8.8 0 0 1-1.2.7L9.4 12.7a.8.8 0 0 1 0-1.4l8.4-5.8a.8.8 0 0 1 1.2.7z"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M17 6.2v11.6a.8.8 0 0 1-1.2.7l-8.4-5.8a.8.8 0 0 1 0-1.4l8.4-5.8a.8.8 0 0 1 1.2.7z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M7 6.2v11.6a.8.8 0 0 0 1.2.7l8.4-5.8a.8.8 0 0 0 0-1.4L8.2 5.5A.8.8 0 0 0 7 6.2z"/></symbol>
+    <symbol id="i-last" viewBox="0 0 24 24"><path d="M18 5v14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M5 6.2v11.6a.8.8 0 0 0 1.2.7l8.4-5.8a.8.8 0 0 0 0-1.4L6.2 5.5A.8.8 0 0 0 5 6.2z"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5.3v13.4a1 1 0 0 0 1.5.9l10.6-6.7a1 1 0 0 0 0-1.8L8.5 4.4A1 1 0 0 0 7 5.3z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3.5a2.5 2.5 0 1 1 5 0H16v3.5a2.5 2.5 0 1 1 0 5V20H4v-3.5a2.5 2.5 0 1 0 0-5z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.4"/><circle cx="10" cy="12" r="2.4"/><circle cx="17.6" cy="18" r="2.4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-chev-d" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4.5H9"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3c5 0 7 10 12 10h3M3 17h3c2 0 3.4-1.5 4.7-3.5M13.3 9.5C14.6 7.8 16 7 18 7h3M18 4l3 3-3 3M18 14l3 3-3 3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15l-4-4M20 16H5l4 4"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.8-4.6 4.4 1.2 6.3L12 17l-5.7 3.1 1.2-6.3-4.6-4.4 6.3-.8z"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><span class="logo" id="logo"><i class="pc wn"></i></span><span class="brand-t"><b>LeoChess</b><small>шаховий тренажер</small></span></div>
+    <div class="prog-pill" id="progPill" title="Скільки ліній уже пройдено в тренуванні"></div>
+    <button class="icbtn" id="bSettings" title="Вигляд: фігури, дошка, тренер" aria-label="Налаштування вигляду"><svg class="ic"><use href="#i-sliders"/></svg></button>
   </div>
-  <div class="tabs" id="tabs"></div>
-  <div class="chips" id="chips"></div>
-  <div class="grid">
-    <div class="card">
-      <div class="mode" id="mode">
-        <button data-m="view" class="on">Перегляд</button>
-        <button data-m="train">Тренування</button>
-        <button data-m="mg">Мітельшпіль</button>
-        <button data-m="an">Аналіз</button>
+</header>
+
+<div class="wrap">
+  <div class="linebar" id="lineBarBox">
+    <button class="lb-nav" id="lnPrev" title="Попередня лінія" aria-label="Попередня лінія"><svg class="ic"><use href="#i-chev-l"/></svg></button>
+    <button class="lb-main" id="lineBar" title="Обрати дебют або партію">
+      <span class="lb-ic"><svg class="ic"><use href="#i-book"/></svg></span>
+      <span class="lb-t"><small id="lbSec"></small><b id="lbName"></b></span>
+      <span class="lb-more"><span>Обрати</span><svg class="ic"><use href="#i-chev-d"/></svg></span>
+    </button>
+    <button class="lb-nav" id="lnNext" title="Наступна лінія" aria-label="Наступна лінія"><svg class="ic"><use href="#i-chev-r"/></svg></button>
+  </div>
+
+  <div class="layout">
+    <aside class="lib sheet" id="lib" aria-label="Бібліотека дебютів і партій">
+      <div class="sheet-panel">
+        <div class="sheet-grip"></div>
+        <div class="sheet-head"><h2>Що тренуємо?</h2><button class="icbtn" data-close="lib" aria-label="Закрити"><svg class="ic"><use href="#i-x"/></svg></button></div>
+        <div class="tabs" id="tabs" role="tablist"></div>
+        <div class="sec-info" id="secInfo"></div>
+        <div class="chips" id="chips"></div>
       </div>
-      <div class="board" id="board"><div class="sqs" id="sqs"></div><div class="layer" id="layer"></div></div>
-      <div class="ctrl" id="ctrlView">
-        <button class="btn" id="bStart" title="На початок">⏮</button>
-        <button class="btn" id="bPrev" title="Назад">◀</button>
-        <button class="btn pri" id="bNext" title="Вперед">▶</button>
-        <button class="btn" id="bEnd" title="В кінець">⏭</button>
-        <button class="btn" id="bAuto" title="Автопрогравання">Авто</button>
-        <button class="btn" id="bFlip" title="Перевернути дошку">⇅</button>
+    </aside>
+
+    <main class="card play">
+      <div class="mode" id="mode" role="tablist">
+        <button data-m="view" class="on"><svg class="ic"><use href="#i-eye"/></svg><span>Перегляд</span></button>
+        <button data-m="train"><svg class="ic"><use href="#i-target"/></svg><span>Тренування</span></button>
+        <button data-m="mg"><svg class="ic"><use href="#i-puzzle"/></svg><span>Мітельшпіль</span></button>
+        <button data-m="an"><svg class="ic"><use href="#i-search"/></svg><span>Аналіз</span></button>
       </div>
-      <div class="ctrl" id="ctrlAn" hidden>
-        <button class="btn" id="aStart" title="На початок">⏮</button>
-        <button class="btn" id="aPrev" title="Назад">◀</button>
-        <button class="btn pri" id="aNext" title="Вперед">▶</button>
-        <button class="btn" id="aEnd" title="В кінець варіанта">⏭</button>
-        <button class="btn" id="aFlip" title="Перевернути дошку">⇅</button>
-        <button class="btn" id="aLine" title="Повернутися до основної лінії">↩ До лінії</button>
-        <button class="btn dng" id="aDel" title="Видалити цей хід і все після нього">Видалити хід</button>
-        <button class="btn dng" id="aClear" title="Видалити всі свої варіанти цієї лінії">Очистити все</button>
+      <div class="board-frame"><div class="board" id="board"><div class="sqs" id="sqs"></div><div class="layer" id="layer"></div></div></div>
+      <div class="ctrl nav" id="ctrlView">
+        <button class="btn ib" id="bStart" title="На початок" aria-label="На початок"><svg class="ic"><use href="#i-first"/></svg></button>
+        <button class="btn ib" id="bPrev" title="Назад" aria-label="Назад"><svg class="ic"><use href="#i-prev"/></svg></button>
+        <button class="btn ib pri wide" id="bNext" title="Вперед" aria-label="Вперед"><svg class="ic"><use href="#i-next"/></svg></button>
+        <button class="btn ib" id="bEnd" title="В кінець" aria-label="В кінець"><svg class="ic"><use href="#i-last"/></svg></button>
+        <button class="btn ib auto" id="bAuto" title="Автопрогравання"><svg class="ic"><use href="#i-play"/></svg><span>Авто</span></button>
+        <button class="btn ib" id="bFlip" title="Перевернути дошку" aria-label="Перевернути дошку"><svg class="ic"><use href="#i-flip"/></svg></button>
       </div>
-      <div class="eng" id="engBox" hidden>
-        <div class="engrow"><span>Оцінка рушія</span><span id="evInfo"></span><label class="sw"><input type="checkbox" id="engOn"> увімк.</label></div>
-        <div id="engBody">
-          <div class="evbar"><div id="evFill"></div></div>
-          <div class="engrow"><b id="evNum">…</b><span style="color:var(--mut);font-size:12.5px">+ — краще білим, − — чорним</span></div>
-          <div class="pv" id="evPv"></div>
-          <div class="ctrl"><button class="btn" id="aBest">Показати найкращий хід</button><button class="btn" id="aCheck">Перевірити мої варіанти</button></div>
+      <div id="ctrlAn" hidden>
+        <div class="ctrl nav">
+          <button class="btn ib" id="aStart" title="На початок" aria-label="На початок"><svg class="ic"><use href="#i-first"/></svg></button>
+          <button class="btn ib" id="aPrev" title="Назад" aria-label="Назад"><svg class="ic"><use href="#i-prev"/></svg></button>
+          <button class="btn ib pri wide" id="aNext" title="Вперед" aria-label="Вперед"><svg class="ic"><use href="#i-next"/></svg></button>
+          <button class="btn ib" id="aEnd" title="В кінець варіанта" aria-label="В кінець варіанта"><svg class="ic"><use href="#i-last"/></svg></button>
+          <button class="btn ib" id="aFlip" title="Перевернути дошку" aria-label="Перевернути дошку"><svg class="ic"><use href="#i-flip"/></svg></button>
+        </div>
+        <div class="ctrl sub-ctrl">
+          <button class="btn sm" id="aLine" title="Повернутися до основної лінії"><svg class="ic"><use href="#i-back"/></svg>До лінії</button>
+          <button class="btn sm dng" id="aDel" title="Видалити цей хід і все після нього"><svg class="ic"><use href="#i-trash"/></svg><span>Видалити</span></button>
+          <button class="btn sm dng" id="aClear" title="Видалити всі свої варіанти цієї лінії">Очистити все</button>
         </div>
       </div>
       <div class="ctrl" id="ctrlTrain" hidden>
-        <button class="btn" id="bSide">Граю за: білих</button>
-        <button class="btn" id="bHint">Підказка</button>
-        <button class="btn" id="bRestart">Заново</button>
-        <button class="btn pri" id="bRandom">Випадкова лінія</button>
+        <button class="btn sm" id="bSide">Граю за: білих</button>
+        <button class="btn sm" id="bHint"><svg class="ic"><use href="#i-bulb"/></svg>Підказка</button>
+        <button class="btn sm" id="bRestart"><svg class="ic"><use href="#i-restart"/></svg>Заново</button>
+        <button class="btn sm pri" id="bRandom"><svg class="ic"><use href="#i-shuffle"/></svg>Випадкова</button>
       </div>
-<div class="coach" id="coach">
+      <div class="talk">
+        <div class="coach" id="coach">
 <!-- @@COACH@@ -->
-</div>
-      <div class="msg" id="msg"></div>
-    </div>
-    <div class="card">
+        </div>
+        <div class="msg" id="msg" aria-live="polite"></div>
+      </div>
+      <div class="eng" id="engBox" hidden>
+        <div class="engrow"><span class="eng-t">Оцінка рушія</span><span id="evInfo"></span><label class="sw"><input type="checkbox" id="engOn"><span class="tog"></span></label></div>
+        <div id="engBody">
+          <div class="evbar"><div id="evFill"></div></div>
+          <div class="engrow"><b id="evNum">…</b><span class="evhelp">+ — краще білим, − — чорним</span></div>
+          <div class="pv" id="evPv"></div>
+          <div class="ctrl"><button class="btn sm" id="aBest">Показати найкращий хід</button><button class="btn sm" id="aCheck">Перевірити мої варіанти</button></div>
+        </div>
+      </div>
+    </main>
+
+    <section class="card info">
       <div class="title" id="lnTitle"></div>
       <div class="sub" id="lnSub"></div>
       <div class="moves" id="moves"></div>
       <h3 id="hPlan">План у мітельшпілі</h3>
       <div class="plan" id="plan"></div>
       <h3 id="hIntro">Про дебют</h3>
-      <div id="intro" style="font-size:14px"></div>
+      <div class="intro" id="intro"></div>
       <div class="stats" id="stats"></div>
-    </div>
+    </section>
   </div>
-  <div class="foot">Підкреслені ходи мають коментар. У режимі тренування торкнись фігури, потім поля. Прогрес зберігається лише в цьому браузері.<br>Оцінка позицій: Stockfish 19 lite (stockfish.js, © Chess.com і автори Stockfish, нейромережа Chris Bao, ліцензія GPL v3, github.com/nmrugg/stockfish.js); запасний рушій — Stockfish 10. Правила ходів: chess.js (BSD). Фігури: набір cburnett.</div>
+
+  <footer class="foot">Підкреслені ходи мають коментар. У тренуванні торкнись фігури, потім поля. Прогрес зберігається лише в цьому браузері.<br>Оцінка позицій: Stockfish 19 lite (stockfish.js, © Chess.com і автори Stockfish, нейромережа Chris Bao, ліцензія GPL v3, github.com/nmrugg/stockfish.js); запасний рушій — Stockfish 10. Правила ходів: chess.js (BSD). Фігури: набір cburnett.</footer>
 </div>
+
+<div class="sheet" id="settings" aria-label="Вигляд">
+  <div class="sheet-panel">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head"><h2>Вигляд</h2><button class="icbtn" data-close="settings" aria-label="Закрити"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <h4>Фігури</h4>
+    <div class="opts" id="optPieces"></div>
+    <h4>Дошка</h4>
+    <div class="opts" id="optBoard"></div>
+    <label class="row-sw"><span><b>Тренер-леопард</b><small>Радіє, сумує й підказує мімікою</small></span><input type="checkbox" id="optCoach"><span class="tog"></span></label>
+  </div>
+</div>
+
 <script type="text/plain" id="sfwasm">/* @@SF19@@ */</script>
 <script type="text/plain" id="sfsrc">/* @@SF10@@ */</script>
 <script>
