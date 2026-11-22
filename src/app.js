@@ -25,17 +25,24 @@ function parseFen(fen){
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
 const icon = (id, cls) => `<svg class="ic${cls ? ' ' + cls : ''}"><use href="#i-${id}"/></svg>`;
 const doneIn = o => o.lines.filter(l => prog[l.id]).length;
+const thumbs = {};
 function thumb(l){                       // small board with the final position of the line
+  if (thumbs[l.id]) return thumbs[l.id];
   const pos = parseFen(l.fen[l.fen.length - 1]), fl = l.side === 'b'; let h = '';
   for (const sq in pos){ const f = 'abcdefgh'.indexOf(sq[0]), r = +sq[1] - 1, x = fl ? 7 - f : f, y = fl ? r : 7 - r;
     h += `<i class="pc ${pos[sq]}" style="transform:translate(${x*100}%,${y*100}%)"></i>`; }
-  return `<span class="thumb" aria-hidden="true">${h}</span>`;
+  return thumbs[l.id] = `<span class="thumb" aria-hidden="true">${h}</span>`;
 }
-let libKey = '';
-function renderTabs(){
+let libKey = '', headKey = '';
+const WIDE = window.matchMedia('(min-width:1180px)');      // the library is a sidebar here, a sheet below
+const libShown = () => WIDE.matches || $('lib').classList.contains('open');
+function renderTabs(force){
   if (S.lib === undefined) S.lib = S.op;
-  const key = [S.lib, S.op, S.ln, JSON.stringify(prog), prefs.pieces, prefs.board].join('|');
-  if (key === libKey) return; libKey = key;
+  const pk = JSON.stringify(prog), hk = [S.op, S.ln, pk].join('|');
+  if (hk !== headKey){ headKey = hk; renderHead(); }
+  if (!force && !libShown()) { libKey = ''; return; }    // a closed sheet is rebuilt when it opens
+  const key = [S.lib, S.op, S.ln, pk].join('|');
+  if (key === libKey && !force) return; libKey = key;
   $('tabs').innerHTML = DATA.map((o, i) => { const d = doneIn(o);
     return `<button class="tab ${i===S.lib?'on':''}" data-i="${i}" role="tab" aria-selected="${i===S.lib}">${o.name}<span class="cnt${d===o.lines.length?' full':''}">${d}/${o.lines.length}</span></button>`; }).join('');
   const O = DATA[S.lib], d = doneIn(O), n = O.lines.length;
@@ -48,7 +55,8 @@ function renderTabs(){
     return `<button class="chip ${on?'on':''}" data-i="${i}"${on?' aria-current="true"':''}>${thumb(l)}<span class="ch-t"><span class="ch-name">${l.name}</span>`
       + `<span class="ch-meta"><i class="disc ${l.side}"></i>за ${l.side==='w'?'білих':'чорних'} · ${mv} ${plural(mv, 'хід', 'ходи', 'ходів')}</span><span class="badges">${st}${mgB}</span></span></button>`;
   }).join('');
-  // header: overall progress; line bar: current line
+}
+function renderHead(){                   // header: overall progress; line bar: current line
   const all = DATA.reduce((a, o) => a + o.lines.length, 0), done = DATA.reduce((a, o) => a + doneIn(o), 0);
   $('progPill').innerHTML = `${icon('star')}${done}/${all} <small>пройдено</small>`;
   const L = line(), O0 = DATA[S.op]; $('lbSec').textContent = `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`; $('lbName').textContent = L.name;
@@ -61,37 +69,48 @@ function stepLine(d){                    // previous / next line through all sec
   S.lib = op; selectLine(op, ln);
 }
 
+(WIDE.addEventListener ? WIDE.addEventListener('change', () => renderTabs(true)) : WIDE.addListener(() => renderTabs(true)));
+
 /* ---------- sheets (library on narrow screens, settings) ---------- */
-function openSheet(id){ if (id === 'lib'){ S.lib = S.op; libKey = ''; renderTabs(); } $(id).classList.add('open'); document.body.classList.add('lock');
+function openSheet(id){ if (id === 'lib'){ S.lib = S.op; renderTabs(true); } $(id).classList.add('open'); document.body.classList.add('lock');
   if (id === 'lib'){ const c = document.querySelector('#chips .chip.on'), t = document.querySelector('#tabs .tab.on');
     if (c) c.scrollIntoView({ block: 'nearest' }); if (t) t.scrollIntoView({ block: 'nearest', inline: 'center' }); } }
 function closeSheet(id){ $(id).classList.remove('open'); if (!document.querySelector('.sheet.open')) document.body.classList.remove('lock'); }
 document.querySelectorAll('.sheet').forEach(sh => sh.addEventListener('click', e => {
   if (e.target === sh || e.target.closest('[data-close]')) closeSheet(sh.id); }));
 
+/* the 64 squares are built once (and again only when the board is flipped); a render just swaps classes,
+   so the page does not rebuild the board on every move */
+let sqEls = null, sqFlip = null;
+function buildSquares(){
+  let html = '';
+  for (let i = 0; i < 64; i++){
+    const row = Math.floor(i/8), col = i % 8, r = S.flip ? row : 7 - row, f = S.flip ? 7 - col : col;
+    let inner = '';
+    if (row === 7) inner += `<span class="co f">${'abcdefgh'[f]}</span>`;
+    if (col === 0) inner += `<span class="co r">${r+1}</span>`;
+    html += `<div class="sq ${(f + r) % 2 ? 'l' : 'd'}" data-sq="${sqName(f, r)}">${inner}</div>`;
+  }
+  $('sqs').innerHTML = html; sqFlip = S.flip;
+  sqEls = Array.from($('sqs').children, el => ({ el, n: el.dataset.sq, base: el.className }));
+}
 function renderBoard(){
   const A = S.mode === 'an', nd = A ? anNode() : null;
   const L = A ? null : cur(); const pos = parseFen(A ? nd.fen.split(' ')[0] : L.fen[S.ply]);
   const last = A ? (nd.uci || null) : (S.ply > 0 ? L.uci[S.ply-1] : null);
   const exp = !A && ((S.mode==='train') || (S.mode==='mg' && L.kind[S.ply]==='t')) && S.ply < L.uci.length ? L.uci[S.ply] : null;
-  let html = '';
-  for (let i = 0; i < 64; i++){
-    const row = Math.floor(i/8), col = i % 8;
-    const r = S.flip ? row : 7 - row, f = S.flip ? 7 - col : col;
-    const n = sqName(f, r); const cls = ['sq', (f + r) % 2 ? 'l' : 'd'];
-    if (last && (n === last.slice(0,2) || n === last.slice(2,4))) cls.push('last');
-    if (S.sel === n) cls.push('sel');
-    if (A && S.showBest){ const e = evOf(nd); if (e && e.pv && (e.pv[0].slice(0,2) === n || e.pv[0].slice(2,4) === n)) cls.push('bm'); }
-    if (A && S.sel && S.dests && S.dests[n]) cls.push(pos[n] || S.dests[n].flags.includes('e') ? 'cap' : 'dot');
-    if (exp && S.hint >= 1 && n === exp.slice(0,2)) cls.push('hint');
-    if (exp && S.hint >= 2 && n === exp.slice(2,4)) cls.push('hint');
-    if (S.flash && S.flash.sq === n) cls.push(S.flash.cls);
-    let inner = '';
-    if (row === 7) inner += `<span class="co f">${'abcdefgh'[f]}</span>`;
-    if (col === 0) inner += `<span class="co r">${r+1}</span>`;
-    html += `<div class="${cls.join(' ')}" data-sq="${n}">${inner}</div>`;
-  }
-  const bd = $('board'); $('sqs').innerHTML = html; bd.classList.toggle('train', S.mode !== 'view');
+  const best = A && S.showBest ? ((evOf(nd) || {}).pv || [])[0] : null;
+  if (!sqEls || sqFlip !== S.flip) buildSquares();
+  const mark = {}, add = (n, c) => { if (n) mark[n] = mark[n] ? mark[n] + ' ' + c : c; };
+  if (last){ add(last.slice(0,2), 'last'); add(last.slice(2,4), 'last'); }
+  add(S.sel, 'sel');
+  if (best){ add(best.slice(0,2), 'bm'); add(best.slice(2,4), 'bm'); }
+  if (A && S.sel && S.dests) for (const n in S.dests) add(n, pos[n] || S.dests[n].flags.includes('e') ? 'cap' : 'dot');
+  if (exp && S.hint >= 1) add(exp.slice(0,2), 'hint');
+  if (exp && S.hint >= 2) add(exp.slice(2,4), 'hint');
+  if (S.flash) add(S.flash.sq, S.flash.cls);
+  for (const q of sqEls){ const c = mark[q.n] ? q.base + ' ' + mark[q.n] : q.base; if (q.el.className !== c) q.el.className = c; }
+  $('board').classList.toggle('train', S.mode !== 'view');
   renderPieces(pos);
 }
 
@@ -133,37 +152,42 @@ const BOARDS = [['wood','Дерево'],['savanna','Савана'],['green','З�
 const BOARD_FOR = { classic:'wood', leo:'savanna', gems:'pearl', fox:'forest', lynx:'taiga', panda:'bamboo', wolf:'night' };
 $('optPieces').innerHTML = PIECES.map(([k, t]) => `<button class="opt" data-pieces="${k}"><span class="sw-p th-${BOARD_FOR[k]}${k === 'classic' ? '' : ' pt-' + k}"><i class="pc wn"></i><i class="pc bn"></i></span>${t}</button>`).join('');
 $('optBoard').innerHTML = BOARDS.map(([k, t]) => `<button class="opt" data-board="${k}"><span class="sw-b th-${k}"></span>${t}</button>`).join('');
-/* The fancy piece sets are big vector drawings (hundreds of facets in «Самоцвіти»); browsers redraw them
-   on every repaint, which made moves and scrolling stutter. Each piece is drawn once into a PNG bitmap
-   and the bitmaps replace the vector images. Any failure simply keeps the vector pieces. */
+/* Themed piece sets live in the page as raw SVG (JSON in #pieceSets) and become CSS only when used:
+   first as vector images (at once), then, piece by piece in the background, as PNG bitmaps.
+   Browsers redraw vector images on every repaint, and the big themed drawings (hundreds of facets in
+   «Самоцвіти») made moves and scrolling stutter; a bitmap is drawn once. Any failure keeps the vectors. */
 const Raster = (() => {
-  const CODES = ['wk','wq','wr','wb','wn','wp','bk','bq','br','bb','bn','bp'], done = {};
-  function svgUrl(theme, code){
-    const host = document.createElement('div'), probe = document.createElement('i');
-    host.className = 'pt-' + theme; host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden';
-    probe.className = 'pc ' + code; host.appendChild(probe); document.body.appendChild(host);
-    const bg = getComputedStyle(probe).backgroundImage; host.remove();
-    const m = bg.match(/^url\(["']?(data:image\/svg\+xml[^"')]+)["']?\)$/); return m ? m[1] : null;
+  const CODES = ['wk','wq','wr','wb','wn','wp','bk','bq','br','bb','bn','bp'], done = {}, vec = {}; let sets = null;
+  function svgOf(theme, code){
+    if (!sets){ try { sets = JSON.parse($('pieceSets').textContent); } catch(e){ sets = {}; } }
+    return (sets[theme] || {})[code];
+  }
+  const uri = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  function vector(theme){
+    if (theme === 'classic' || vec[theme]) return; vec[theme] = true;
+    const st = document.createElement('style'); st.dataset.vector = theme;
+    st.textContent = CODES.filter(c => svgOf(theme, c)).map(c => `.pt-${theme} .pc.${c}{background-image:url("${uri(svgOf(theme, c))}")}`).join('\n');
+    document.head.appendChild(st);
   }
   async function one(theme, code, size){
-    const src = svgUrl(theme, code); if (!src) return '';
-    const img = new Image(); img.src = src; await img.decode();
+    const svg = svgOf(theme, code); if (!svg) return '';
+    const img = new Image(); img.src = uri(svg); await img.decode();
     const c = document.createElement('canvas'); c.width = c.height = size;
     c.getContext('2d').drawImage(img, 0, 0, size, size);
     return `.pt-${theme} .pc.${code}{background-image:url("${c.toDataURL('image/png')}")}`;
   }
   function make(theme){
-    if (!theme || theme === 'classic' || done[theme]) return done[theme];
+    if (!theme || theme === 'classic') return;
+    vector(theme); if (done[theme]) return done[theme];
     const sq = ($('board').clientWidth || 400) / 8, size = Math.max(128, Math.min(256, Math.ceil(sq * (window.devicePixelRatio || 1))));
-    const ready = document.readyState === 'loading'      // pieces.css comes after this script in the page
-      ? new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true })) : Promise.resolve();
     const pause = () => new Promise(r => setTimeout(r, 0));   // one piece at a time, so the page never freezes
-    return done[theme] = ready.then(async () => { const rules = []; for (const c of CODES){ rules.push(await one(theme, c, size)); await pause(); } return rules; }).then(rules => {
+    return done[theme] = (async () => { const rules = []; for (const c of CODES){ rules.push(await one(theme, c, size)); await pause(); } return rules; })().then(rules => {
       if (rules.some(r => !r)) throw new Error('no vector image for ' + theme);
       const st = document.createElement('style'); st.dataset.raster = theme; st.textContent = rules.join('\n'); document.body.appendChild(st);
+      const v = document.head.querySelector(`style[data-vector="${theme}"]`); if (v) v.remove();   // the vectors are no longer needed
     }).catch(() => { delete done[theme]; });
   }
-  return { make, async all(){ for (const [k] of PIECES) await make(k); } };
+  return { make, async all(){ PIECES.forEach(([k]) => k !== 'classic' && vector(k)); for (const [k] of PIECES) await make(k); } };
 })();
 function applyStyle(){
   const pcs = prefs.pieces || 'classic', th = prefs.board || 'wood';
@@ -428,7 +452,7 @@ const Eng = (() => {
     }
     next(); return true;
   }
-  return { req, get: fen => cache[key(fen)], deep: () => flavour === 'wasm' ? 18 : 14, onUpdate(f){ onUpd = f; }, pending: () => queue.length + (cur ? 1 : 0),
+  return { req, get: fen => cache[key(fen)], flavour: () => failed ? 'none' : flavour, deep: () => flavour === 'wasm' ? 18 : 14, onUpdate(f){ onUpd = f; }, pending: () => queue.length + (cur ? 1 : 0),
            clear(){ queue = []; if (cur && w){ cur.stopped = true; w.postMessage('stop'); } }, failed: () => failed };
 })();
 
@@ -505,8 +529,17 @@ Eng.onUpdate((fen, final) => {
     const n = anNode(); if (!n.main && (n.fen === fen || (n.p !== null && S.an.nodes[n.p].fen === fen))) anMsg(); }
 });
 
+let movesKey = '', infoKey = '';
 function renderMoves(){
-  if (S.mode === 'an'){ $('moves').innerHTML = anMoves(); return; }
+  if (S.mode === 'an'){ movesKey = ''; $('moves').innerHTML = anMoves(); return; }
+  const growing = (S.mode === 'train' || S.mode === 'mg') && !S.done;
+  const key = [S.op, S.ln, S.mode, S.done, growing ? S.ply : ''].join('|');
+  if (key === movesKey){                 // same list: only the highlighted move changes
+    const o = $('moves').querySelector('.mv.cur'), n = $('moves').querySelector(`.mv[data-p="${S.ply}"]`);
+    if (o !== n){ if (o) o.classList.remove('cur'); if (n) n.classList.add('cur'); }
+    return;
+  }
+  movesKey = key;
   const L = cur(); let h = '';
   L.san.forEach((s, i) => {
     const lb = label(i); const num = (lb.endsWith('.') || i === 0) ? `<span class="n">${lb}</span>` : '';
@@ -519,6 +552,8 @@ function renderMoves(){
 
 function renderInfo(){
   const O = DATA[S.op], L = line();
+  const key = [S.op, S.ln, S.mode, JSON.stringify(prog[L.id + (S.mode === 'mg' ? '#mg' : '')] || 0)].join('|');
+  if (key === infoKey) return; infoKey = key;
   $('lnTitle').textContent = L.name + (S.mode === 'mg' ? ' · мітельшпіль' : S.mode === 'an' ? ' · аналіз' : '');
   $('lnSub').textContent = S.mode === 'an' ? 'Основна лінія звичайним шрифтом, твої варіанти — курсивом. Варіанти зберігаються в цьому браузері.'
     : S.mode === 'mg'

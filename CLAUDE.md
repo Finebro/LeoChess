@@ -21,7 +21,7 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 
 `dist/` і `build/` генеруються — **не редагуй їх вручну** і не коміть (є в `.gitignore`).
 `src/index.html` містить плейсхолдери, які підставляє `scripts/build.py`:
-`<!-- @@COACH@@ -->`, `/* @@STYLES@@ */`, `/* @@SF19@@ */`, `/* @@SF10@@ */`, `/* @@CHESSJS@@ */`,
+`<!-- @@COACH@@ -->`, `/* @@STYLES@@ */`, `/* @@SF19@@ */`, `/* @@SF10@@ */`, `/* @@PIECESETS@@ */`, `/* @@CHESSJS@@ */`,
 `/* @@APP@@ */`, `/* @@PIECES@@ */`; у `src/app.js` — `/* @@DATA@@ */`.
 
 ## Структура
@@ -36,7 +36,7 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 | `data/middlegame.py` | завдання мітельшпілю для ліній (`MG`, ключ — id лінії) |
 | `data/morphy.py`, `data/miniatures.py` | розділи «Партії Морфі», «Атакуючі мініатюри» |
 | `scripts/build_data.py` | перевіряє кожен хід через python-chess і пише `build/data.json` |
-| `scripts/build_pieces.py` + `piece_art.py` | теми фігур → `build/pieces.css` |
+| `scripts/build_pieces.py` + `piece_art.py` | фігури: класичні → `build/pieces.css`, тематичні (сирі SVG) → `build/pieces.json` |
 | `vendor/` | chess.js 0.10.3, Stockfish 19 lite (wasm), Stockfish 10 (asm.js, запасний) |
 | `tests/` | браузерні тести Playwright; `tests/run_all.sh` запускає все |
 | `tools/` | перевірка контенту локальним Stockfish (`apt install stockfish`) |
@@ -60,9 +60,10 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 - `Eng` — Stockfish у Web Worker з черги запитів; `req(fen, foreground)`, кеш оцінок, `deep()`.
   Спершу запускається Stockfish 19 lite, при збої — Stockfish 10. `moveMark` ставить `?!`/`?`/`??`
   за зміною шансів на виграш (як на Lichess), `explain` будує пояснення з варіантів рушія.
-- `Raster` — стилізовані фігури (векторні SVG із візерунками, особливо «Самоцвіти») один раз перемальовуються
-  в PNG і підміняють SVG: інакше браузер перемальовує вектор на кожному кадрі й сторінка гальмує.
-  Нові теми фігур підхоплюються автоматично (список `PIECES`).
+- `Raster` — тематичні фігури лежать у сторінці як JSON із сирими SVG (`#pieceSets`) і стають CSS лише для
+  обраного набору: спершу вектором, потім фоном, по одній фігурі, перемальовуються в PNG (вектор із візерунками,
+  особливо «Самоцвіти», браузер перемальовує на кожному кадрі — гальмувало). Нові теми підхоплюються самі (`PIECES`).
+- `Eng.flavour()` — `wasm` (Stockfish 19) | `asm` (запасний Stockfish 10) | `none`.
 - localStorage (усе в try/catch): `openingTrainer` — прогрес, `openingTrainerStyle` — тема/дошка/тренер/рушій,
   `openingTrainerAn` — варіанти аналізу по лініях. Ключі не перейменовуй — у користувачів збережений прогрес.
 
@@ -97,10 +98,22 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 - Автор дозволив: після перевірок створюй pull request у `main` і **зливай його самостійно**
   («Merge pull request» → «Confirm merge»), не чекаючи на автора. Потім перевір, що збірка в Actions пройшла.
 
+## Швидкодія (важливо для анімацій)
+
+- Анімуй лише `transform` і `opacity`; не міняй `top/left/width/height` у русі.
+- Дошка не перебудовується: 64 клітинки створюються раз (`buildSquares`, повторно лише при перевороті),
+  рендер лише міняє класи. Фігури — окремий шар (`renderPieces`), кожна рухається `transform`.
+- `renderTabs`, `renderMoves`, `renderInfo` перемальовують лише те, що змінилося (ключі `libKey`, `movesKey`,
+  `infoKey`); закрита шторка бібліотеки не будується, доки її не відкриють.
+- Не вставляй великі векторні картинки прямо як фон рухомих елементів — малюй їх у PNG (як `Raster`).
+- Поважай `prefers-reduced-motion` (блок у кінці `styles.css`).
+
 ## Обмеження
 
 - Сторінка має лишатися одним файлом (її також публікують як артефакт і на GitHub Pages): без зовнішніх
   запитів, усе вбудоване. Нові бібліотеки — у `vendor/` і через плейсхолдер у `build.py`.
-- `build.py` патчить завантажувач Stockfish 19 (хук `instantiateWasm`), щоб wasm брався з base64.
+- `build.py` патчить завантажувач Stockfish 19 (хук `instantiateWasm`): wasm вбудований стиснутим (gzip+base64,
+  2,4 → 1,6 МБ) і розпаковується у воркері через `DecompressionStream`; де його немає — вмикається Stockfish 10
+  (його навмисно не стискаємо — він саме для старих браузерів). `test_ui.py` перевіряє, що стартує саме Stockfish 19.
   При оновленні Stockfish перевір, що хук знаходиться (інакше build зупиниться з поясненням).
 - Ліцензія GPL v3 через Stockfish — рядок про авторів унизу сторінки не прибирай.

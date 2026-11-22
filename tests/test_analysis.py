@@ -1,6 +1,6 @@
 """«Аналіз»: free moves, variations, persistence, phone width, engine explanations."""
 from playwright.sync_api import sync_playwright
-from conftest_helpers import open_page, tap, pick, OUT
+from conftest_helpers import DATA, open_page, tap, pick, OUT
 import os
 
 def why(pg):
@@ -9,7 +9,7 @@ def why(pg):
 
 with sync_playwright() as p:
     br, pg, errs = open_page(p)
-    sec = [i for i, t in enumerate(pg.eval_on_selector_all('#tabs .tab', 'e=>e.map(x=>x.textContent)')) if 'мініатюри' in t][0]
+    sec = [i for i, o in enumerate(DATA) if o['id'] == 'minis'][0]
     pick(pg, sec, 0); pg.click('#mode button[data-m="an"]')
     for _ in range(3): pg.click('#aNext')
     tap(pg, 'd8', 'g5'); w = why(pg); print('hanging queen:', w); assert 'без захисту' in w

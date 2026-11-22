@@ -140,6 +140,7 @@ input:focus-visible+.tog{outline:2px solid var(--acc);outline-offset:2px}
 
 /* ---------- board ---------- */
 .board{position:relative;width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;box-shadow:0 8px 22px -8px rgba(60,35,10,.45),0 0 0 1px rgba(0,0,0,.06)}
+.board{contain:layout paint}            /* changes on the board never re-layout the rest of the page */
 .sqs{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)}
 .layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .th-green{--light:#eeeed2;--dark:#769656}
@@ -348,3 +349,9 @@ h3::after{content:"";flex:1;height:1px;background:var(--line)}
 .m-cool #browL{transform:translateY(-7px) rotate(-6deg)}.m-cool #browR{transform:translateY(2px)}
 .m-cool #tail1{transform:rotate(-12deg)}.m-cool #tail2{transform:rotate(-36deg)}
 @media (prefers-reduced-motion:reduce){.leo-coach *{animation:none!important}}
+
+/* ---------- performance ---------- */
+/* phones: the info card and footer below the board are laid out only when scrolled near */
+@media(max-width:819px){.info,.foot{content-visibility:auto;contain-intrinsic-size:auto 900px}}
+/* people who asked the system for less motion */
+@media (prefers-reduced-motion:reduce){.pc{transition:opacity .2s}.sheet,.sheet-panel,.btn,.chip,.mode button{transition:none}.sq.hint::after{animation:none}}
