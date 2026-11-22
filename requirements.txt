@@ -1,0 +1,2 @@
+chess>=1.10        # python-chess: parses and validates every move at build time
+playwright>=1.40   # browser tests (after install: python -m playwright install chromium)

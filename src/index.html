@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeoChess — шаховий тренажер</title>
+<style>/* @@STYLES@@ */</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>♞ LeoChess <span class="tagline">шаховий тренажер</span></h1>
+  <div class="style">
+    <label>Фігури <select id="selPieces"><option value="classic">Класичні</option><option value="leo">Леопард</option><option value="gems">Самоцвіти</option><option value="fox">Лисиці</option><option value="lynx">Рись</option><option value="panda">Панди</option><option value="wolf">Вовки</option></select></label>
+    <label>Тренер <select id="selCoach"><option value="on">Леопард</option><option value="off">Вимк.</option></select></label>
+    <label>Дошка <select id="selBoard"><option value="wood">Дерево</option><option value="savanna">Савана</option><option value="green">Зелена</option><option value="blue">Сіро-блакитна</option><option value="pearl">Перлова</option><option value="forest">Осінній ліс</option><option value="night">Нічний ліс</option><option value="taiga">Тайга</option><option value="bamboo">Бамбук</option></select></label>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="chips" id="chips"></div>
+  <div class="grid">
+    <div class="card">
+      <div class="mode" id="mode">
+        <button data-m="view" class="on">Перегляд</button>
+        <button data-m="train">Тренування</button>
+        <button data-m="mg">Мітельшпіль</button>
+        <button data-m="an">Аналіз</button>
+      </div>
+      <div class="board" id="board"><div class="sqs" id="sqs"></div><div class="layer" id="layer"></div></div>
+      <div class="ctrl" id="ctrlView">
+        <button class="btn" id="bStart" title="На початок">⏮</button>
+        <button class="btn" id="bPrev" title="Назад">◀</button>
+        <button class="btn pri" id="bNext" title="Вперед">▶</button>
+        <button class="btn" id="bEnd" title="В кінець">⏭</button>
+        <button class="btn" id="bAuto" title="Автопрогравання">Авто</button>
+        <button class="btn" id="bFlip" title="Перевернути дошку">⇅</button>
+      </div>
+      <div class="ctrl" id="ctrlAn" hidden>
+        <button class="btn" id="aStart" title="На початок">⏮</button>
+        <button class="btn" id="aPrev" title="Назад">◀</button>
+        <button class="btn pri" id="aNext" title="Вперед">▶</button>
+        <button class="btn" id="aEnd" title="В кінець варіанта">⏭</button>
+        <button class="btn" id="aFlip" title="Перевернути дошку">⇅</button>
+        <button class="btn" id="aLine" title="Повернутися до основної лінії">↩ До лінії</button>
+        <button class="btn dng" id="aDel" title="Видалити цей хід і все після нього">Видалити хід</button>
+        <button class="btn dng" id="aClear" title="Видалити всі свої варіанти цієї лінії">Очистити все</button>
+      </div>
+      <div class="eng" id="engBox" hidden>
+        <div class="engrow"><span>Оцінка рушія</span><span id="evInfo"></span><label class="sw"><input type="checkbox" id="engOn"> увімк.</label></div>
+        <div id="engBody">
+          <div class="evbar"><div id="evFill"></div></div>
+          <div class="engrow"><b id="evNum">…</b><span style="color:var(--mut);font-size:12.5px">+ — краще білим, − — чорним</span></div>
+          <div class="pv" id="evPv"></div>
+          <div class="ctrl"><button class="btn" id="aBest">Показати найкращий хід</button><button class="btn" id="aCheck">Перевірити мої варіанти</button></div>
+        </div>
+      </div>
+      <div class="ctrl" id="ctrlTrain" hidden>
+        <button class="btn" id="bSide">Граю за: білих</button>
+        <button class="btn" id="bHint">Підказка</button>
+        <button class="btn" id="bRestart">Заново</button>
+        <button class="btn pri" id="bRandom">Випадкова лінія</button>
+      </div>
+<div class="coach" id="coach">
+<!-- @@COACH@@ -->
+</div>
+      <div class="msg" id="msg"></div>
+    </div>
+    <div class="card">
+      <div class="title" id="lnTitle"></div>
+      <div class="sub" id="lnSub"></div>
+      <div class="moves" id="moves"></div>
+      <h3 id="hPlan">План у мітельшпілі</h3>
+      <div class="plan" id="plan"></div>
+      <h3 id="hIntro">Про дебют</h3>
+      <div id="intro" style="font-size:14px"></div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+  <div class="foot">Підкреслені ходи мають коментар. У режимі тренування торкнись фігури, потім поля. Прогрес зберігається лише в цьому браузері.<br>Оцінка позицій: Stockfish 19 lite (stockfish.js, © Chess.com і автори Stockfish, нейромережа Chris Bao, ліцензія GPL v3, github.com/nmrugg/stockfish.js); запасний рушій — Stockfish 10. Правила ходів: chess.js (BSD). Фігури: набір cburnett.</div>
+</div>
+<script type="text/plain" id="sfwasm">/* @@SF19@@ */</script>
+<script type="text/plain" id="sfsrc">/* @@SF10@@ */</script>
+<script>
+/* @@CHESSJS@@ */
+</script>
+<script>
+/* @@APP@@ */
+</script>
+<style>/* @@PIECES@@ */</style>
+</body>
+</html>
