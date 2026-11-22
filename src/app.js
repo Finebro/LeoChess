@@ -133,6 +133,38 @@ const BOARDS = [['wood','Дерево'],['savanna','Савана'],['green','З�
 const BOARD_FOR = { classic:'wood', leo:'savanna', gems:'pearl', fox:'forest', lynx:'taiga', panda:'bamboo', wolf:'night' };
 $('optPieces').innerHTML = PIECES.map(([k, t]) => `<button class="opt" data-pieces="${k}"><span class="sw-p th-${BOARD_FOR[k]}${k === 'classic' ? '' : ' pt-' + k}"><i class="pc wn"></i><i class="pc bn"></i></span>${t}</button>`).join('');
 $('optBoard').innerHTML = BOARDS.map(([k, t]) => `<button class="opt" data-board="${k}"><span class="sw-b th-${k}"></span>${t}</button>`).join('');
+/* The fancy piece sets are big vector drawings (hundreds of facets in «Самоцвіти»); browsers redraw them
+   on every repaint, which made moves and scrolling stutter. Each piece is drawn once into a PNG bitmap
+   and the bitmaps replace the vector images. Any failure simply keeps the vector pieces. */
+const Raster = (() => {
+  const CODES = ['wk','wq','wr','wb','wn','wp','bk','bq','br','bb','bn','bp'], done = {};
+  function svgUrl(theme, code){
+    const host = document.createElement('div'), probe = document.createElement('i');
+    host.className = 'pt-' + theme; host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden';
+    probe.className = 'pc ' + code; host.appendChild(probe); document.body.appendChild(host);
+    const bg = getComputedStyle(probe).backgroundImage; host.remove();
+    const m = bg.match(/^url\(["']?(data:image\/svg\+xml[^"')]+)["']?\)$/); return m ? m[1] : null;
+  }
+  async function one(theme, code, size){
+    const src = svgUrl(theme, code); if (!src) return '';
+    const img = new Image(); img.src = src; await img.decode();
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    c.getContext('2d').drawImage(img, 0, 0, size, size);
+    return `.pt-${theme} .pc.${code}{background-image:url("${c.toDataURL('image/png')}")}`;
+  }
+  function make(theme){
+    if (!theme || theme === 'classic' || done[theme]) return done[theme];
+    const sq = ($('board').clientWidth || 400) / 8, size = Math.max(128, Math.min(256, Math.ceil(sq * (window.devicePixelRatio || 1))));
+    const ready = document.readyState === 'loading'      // pieces.css comes after this script in the page
+      ? new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true })) : Promise.resolve();
+    const pause = () => new Promise(r => setTimeout(r, 0));   // one piece at a time, so the page never freezes
+    return done[theme] = ready.then(async () => { const rules = []; for (const c of CODES){ rules.push(await one(theme, c, size)); await pause(); } return rules; }).then(rules => {
+      if (rules.some(r => !r)) throw new Error('no vector image for ' + theme);
+      const st = document.createElement('style'); st.dataset.raster = theme; st.textContent = rules.join('\n'); document.body.appendChild(st);
+    }).catch(() => { delete done[theme]; });
+  }
+  return { make, async all(){ for (const [k] of PIECES) await make(k); } };
+})();
 function applyStyle(){
   const pcs = prefs.pieces || 'classic', th = prefs.board || 'wood';
   ['board', 'lib', 'logo'].forEach(id => { const el = $(id);
@@ -141,11 +173,12 @@ function applyStyle(){
   document.querySelectorAll('[data-pieces]').forEach(b => b.classList.toggle('on', b.dataset.pieces === pcs));
   document.querySelectorAll('[data-board]').forEach(b => b.classList.toggle('on', b.dataset.board === th));
   $('coach').hidden = !COACH_ON || prefs.coach === 'off';
+  Raster.make(pcs);
 }
 $('settings').addEventListener('click', e => { const b = e.target.closest('.opt'); if (!b) return;
   if (b.dataset.pieces){ prefs.pieces = b.dataset.pieces; prefs.board = BOARD_FOR[prefs.pieces]; } else prefs.board = b.dataset.board;
   savePrefs(); applyStyle(); });
-$('bSettings').onclick = () => openSheet('settings');
+$('bSettings').onclick = () => { openSheet('settings'); setTimeout(Raster.all, 350); };   // swatches too, after the sheet slid in
 
 /* ---------- leopard coach: mime only ---------- */
 const COACH_ON = false;                 // hidden for now at the author's request; true brings the leopard back (also restore #optCoach in index.html)
