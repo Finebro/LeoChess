@@ -55,6 +55,8 @@ python3 scripts/build.py --page   # лише перезібрати сторін
   мітельшпіль — `startMg`, `mgNext`, `mgTap`, `mgFinish`; аналіз — `startAn`, `anTap`, `anGo`, дерево `S.an.nodes`.
   Відкладені ходи (`S.oppT`, `S.mgT`, `S.flashT`) скасовує `stopTimers()` — викликай його при кожній зміні лінії чи режиму.
 - `Coach` — реакції леопарда (лише міміка, без тексту): `view`, `mine`, `opp`, `wrong`, `hint`, `finish`.
+  **Зараз вимкнений** на прохання автора (`COACH_ON = false`, `#coach` прихований, перемикач у «Вигляді» прибрано);
+  щоб повернути — `COACH_ON = true` і рядок `#optCoach` у шторці налаштувань.
 - `Eng` — Stockfish у Web Worker з черги запитів; `req(fen, foreground)`, кеш оцінок, `deep()`.
   Спершу запускається Stockfish 19 lite, при збої — Stockfish 10. `moveMark` ставить `?!`/`?`/`??`
   за зміною шансів на виграш (як на Lichess), `explain` будує пояснення з варіантів рушія.

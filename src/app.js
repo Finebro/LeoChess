@@ -140,19 +140,19 @@ function applyStyle(){
     el.classList.add('th-' + th); if (pcs !== 'classic') el.classList.add('pt-' + pcs); });
   document.querySelectorAll('[data-pieces]').forEach(b => b.classList.toggle('on', b.dataset.pieces === pcs));
   document.querySelectorAll('[data-board]').forEach(b => b.classList.toggle('on', b.dataset.board === th));
-  $('optCoach').checked = prefs.coach !== 'off'; $('coach').hidden = prefs.coach === 'off';
+  $('coach').hidden = !COACH_ON || prefs.coach === 'off';
 }
 $('settings').addEventListener('click', e => { const b = e.target.closest('.opt'); if (!b) return;
   if (b.dataset.pieces){ prefs.pieces = b.dataset.pieces; prefs.board = BOARD_FOR[prefs.pieces]; } else prefs.board = b.dataset.board;
   savePrefs(); applyStyle(); });
-$('optCoach').onchange = e => { prefs.coach = e.target.checked ? 'on' : 'off'; savePrefs(); applyStyle(); };
 $('bSettings').onclick = () => openSheet('settings');
 
 /* ---------- leopard coach: mime only ---------- */
+const COACH_ON = false;                 // hidden for now at the author's request; true brings the leopard back (also restore #optCoach in index.html)
 const Coach = (() => {
   const svg = $('coachSvg'); let t = null;
   function react(mood){
-    if (prefs.coach === 'off') return;
+    if (!COACH_ON || prefs.coach === 'off') return;
     clearTimeout(t);
     svg.setAttribute('class', 'leo-coach'); void svg.getBoundingClientRect();   // restart animations
     svg.setAttribute('class', 'leo-coach m-' + mood);
