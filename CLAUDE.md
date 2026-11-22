@@ -21,7 +21,7 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 
 `dist/` і `build/` генеруються — **не редагуй їх вручну** і не коміть (є в `.gitignore`).
 `src/index.html` містить плейсхолдери, які підставляє `scripts/build.py`:
-`<!-- @@COACH@@ -->`, `/* @@STYLES@@ */`, `/* @@SF19@@ */`, `/* @@SF10@@ */`, `/* @@PIECESETS@@ */`, `/* @@CHESSJS@@ */`,
+`<!-- @@ICONS@@ -->`, `<!-- @@COACH@@ -->`, `/* @@STYLES@@ */`, `/* @@SF19@@ */`, `/* @@SF10@@ */`, `/* @@PIECESETS@@ */`, `/* @@CHESSJS@@ */`,
 `/* @@APP@@ */`, `/* @@PIECES@@ */`; у `src/app.js` — `/* @@DATA@@ */`.
 
 ## Структура
@@ -32,6 +32,7 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 | `src/styles.css` | усі стилі, включно з анімаціями тренера-леопарда (класи `m-happy`, `m-sad`…) |
 | `src/app.js` | уся логіка (див. нижче) |
 | `src/coach.svg` | малюнок тренера; генерується `scripts/build_coach.py` |
+| `assets/icon.svg` + `icon-32.png`, `apple-touch-icon.png` | іконка вкладки й «На початковий екран»; PNG малює `scripts/build_icons.py` (Playwright, вручну після зміни SVG) |
 | `data/openings.py` | розділи дебютів і лінії (`OPENINGS`) |
 | `data/middlegame.py` | завдання мітельшпілю для ліній (`MG`, ключ — id лінії) |
 | `data/morphy.py`, `data/miniatures.py` | розділи «Партії Морфі», «Атакуючі мініатюри» |
