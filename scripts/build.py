@@ -32,11 +32,22 @@ def sf19_worker():
     return unpack + js.replace(SF19_HOOK, SF19_PATCH)
 
 
+def icons():
+    """Tab icon (SVG, with a 32 px PNG for browsers without SVG icons) and the iPhone home-screen icon,
+    embedded as data URIs so the page stays one file. PNGs are rendered by scripts/build_icons.py."""
+    uri = lambda mime, *f: f'data:{mime};base64,' + base64.b64encode(open(P(*f), 'rb').read()).decode()
+    return '\n'.join([
+        f'<link rel="icon" type="image/png" sizes="32x32" href="{uri("image/png", "assets", "icon-32.png")}">',
+        f'<link rel="icon" type="image/svg+xml" sizes="any" href="{uri("image/svg+xml", "assets", "icon.svg")}">',
+        f'<link rel="apple-touch-icon" href="{uri("image/png", "assets", "apple-touch-icon.png")}">'])
+
+
 def main():
     if '--page' not in sys.argv:
         subprocess.run([sys.executable, P('scripts', 'build_data.py')], check=True)
         subprocess.run([sys.executable, P('scripts', 'build_pieces.py')], check=True)
     parts = {
+        '<!-- @@ICONS@@ -->': icons(),
         '<!-- @@COACH@@ -->': read('src', 'coach.svg').rstrip('\n'),
         '/* @@STYLES@@ */': read('src', 'styles.css').rstrip('\n'),
         '/* @@SF19@@ */': sf19_worker(),
@@ -47,7 +58,7 @@ def main():
     html = read('src', 'index.html')
     for k, v in parts.items():
         if html.count(k) != 1: raise SystemExit(f'placeholder {k} must appear exactly once in src/index.html')
-        if '</script' in v and k not in ('<!-- @@COACH@@ -->', '/* @@STYLES@@ */'):
+        if '</script' in v and k not in ('<!-- @@ICONS@@ -->', '<!-- @@COACH@@ -->', '/* @@STYLES@@ */'):
             raise SystemExit(f'{k}: content contains </script and would break the page')
         html = html.replace(k, v)
     # data and pieces go in last: they are inserted into app.js / the trailing <style>
