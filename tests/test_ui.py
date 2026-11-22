@@ -30,9 +30,9 @@ with sync_playwright() as p:
         assert s['lb'] == s['name'] and s['tab'] == s['op'], s
     assert pg.is_disabled('#lnNext')
     # settings survive a reload
-    pg.click('#bSettings'); pg.wait_for_timeout(350); pg.click('[data-pieces="fox"]'); pg.click('.row-sw')
+    pg.click('#bSettings'); pg.wait_for_timeout(350); pg.click('[data-pieces="fox"]')
     pg.keyboard.press('Escape'); pg.reload()
-    assert 'pt-fox' in pg.get_attribute('#board', 'class') and pg.is_hidden('#coach'), 'settings not saved'
+    assert 'pt-fox' in pg.get_attribute('#board', 'class') and pg.is_hidden('#coach'), 'settings not saved / leopard should be hidden'
     br.close()
     for w in (320, 390):
         br, pg, e2 = open_page(p, width=w)
