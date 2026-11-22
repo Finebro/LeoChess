@@ -21,14 +21,53 @@ function parseFen(fen){
   return b;
 }
 
-function renderTabs(){
-  $('tabs').innerHTML = DATA.map((o, i) => `<button class="tab ${i===S.op?'on':''}" data-i="${i}">${o.name}</button>`).join('');
-  $('chips').innerHTML = DATA[S.op].lines.map((l, i) => {
-    const p = prog[l.id]; const st = p ? (p.best === 0 ? '✓' : '•') : '';
-    const mg = prog[l.id + '#mg'] ? '<span class="st" title="Мітельшпіль пройдено">♟</span>' : '';
-    return `<button class="chip ${i===S.ln?'on':''}" data-i="${i}">${l.name}<span class="side">${l.side==='w'?'(білі)':'(чорні)'}</span>${st?`<span class="st">${st}</span>`:''}${mg}</button>`;
-  }).join('');
+/* ---------- library: sections and line cards ---------- */
+const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };
+const icon = (id, cls) => `<svg class="ic${cls ? ' ' + cls : ''}"><use href="#i-${id}"/></svg>`;
+const doneIn = o => o.lines.filter(l => prog[l.id]).length;
+function thumb(l){                       // small board with the final position of the line
+  const pos = parseFen(l.fen[l.fen.length - 1]), fl = l.side === 'b'; let h = '';
+  for (const sq in pos){ const f = 'abcdefgh'.indexOf(sq[0]), r = +sq[1] - 1, x = fl ? 7 - f : f, y = fl ? r : 7 - r;
+    h += `<i class="pc ${pos[sq]}" style="transform:translate(${x*100}%,${y*100}%)"></i>`; }
+  return `<span class="thumb" aria-hidden="true">${h}</span>`;
 }
+let libKey = '';
+function renderTabs(){
+  if (S.lib === undefined) S.lib = S.op;
+  const key = [S.lib, S.op, S.ln, JSON.stringify(prog), prefs.pieces, prefs.board].join('|');
+  if (key === libKey) return; libKey = key;
+  $('tabs').innerHTML = DATA.map((o, i) => { const d = doneIn(o);
+    return `<button class="tab ${i===S.lib?'on':''}" data-i="${i}" role="tab" aria-selected="${i===S.lib}">${o.name}<span class="cnt${d===o.lines.length?' full':''}">${d}/${o.lines.length}</span></button>`; }).join('');
+  const O = DATA[S.lib], d = doneIn(O), n = O.lines.length;
+  $('secInfo').innerHTML = `<span>${O.eco ? O.eco + ' · ' : ''}${n} ${plural(n, 'лінія', 'лінії', 'ліній')}</span><span class="bar"><i style="width:${Math.round(100*d/n)}%"></i></span><span>${d}/${n}</span>`;
+  $('chips').innerHTML = O.lines.map((l, i) => {
+    const p = prog[l.id], mg = prog[l.id + '#mg'], mv = Math.ceil(l.san.length/2);
+    const st = p ? (p.best === 0 ? `<span class="bdg ok">${icon('check')}без помилок</span>` : `<span class="bdg go">${icon('star')}пройдено ×${p.runs}</span>`) : '<span class="bdg">нова</span>';
+    const mgB = l.mg ? `<span class="bdg${mg ? ' ok' : ''}" title="${mg ? 'Мітельшпіль пройдено' : 'Є завдання з мітельшпілю'}">${icon(mg ? 'check' : 'puzzle')}мітельшпіль</span>` : '';
+    const on = S.lib === S.op && i === S.ln;
+    return `<button class="chip ${on?'on':''}" data-i="${i}"${on?' aria-current="true"':''}>${thumb(l)}<span class="ch-t"><span class="ch-name">${l.name}</span>`
+      + `<span class="ch-meta"><i class="disc ${l.side}"></i>за ${l.side==='w'?'білих':'чорних'} · ${mv} ${plural(mv, 'хід', 'ходи', 'ходів')}</span><span class="badges">${st}${mgB}</span></span></button>`;
+  }).join('');
+  // header: overall progress; line bar: current line
+  const all = DATA.reduce((a, o) => a + o.lines.length, 0), done = DATA.reduce((a, o) => a + doneIn(o), 0);
+  $('progPill').innerHTML = `${icon('star')}${done}/${all} <small>пройдено</small>`;
+  const L = line(), O0 = DATA[S.op]; $('lbSec').textContent = `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`; $('lbName').textContent = L.name;
+  $('lnPrev').disabled = S.op === 0 && S.ln === 0; $('lnNext').disabled = S.op === DATA.length - 1 && S.ln === DATA[S.op].lines.length - 1;
+}
+function stepLine(d){                    // previous / next line through all sections
+  let op = S.op, ln = S.ln + d;
+  if (ln < 0){ if (op === 0) return; op--; ln = DATA[op].lines.length - 1; }
+  else if (ln >= DATA[op].lines.length){ if (op === DATA.length - 1) return; op++; ln = 0; }
+  S.lib = op; selectLine(op, ln);
+}
+
+/* ---------- sheets (library on narrow screens, settings) ---------- */
+function openSheet(id){ if (id === 'lib'){ S.lib = S.op; libKey = ''; renderTabs(); } $(id).classList.add('open'); document.body.classList.add('lock');
+  if (id === 'lib'){ const c = document.querySelector('#chips .chip.on'), t = document.querySelector('#tabs .tab.on');
+    if (c) c.scrollIntoView({ block: 'nearest' }); if (t) t.scrollIntoView({ block: 'nearest', inline: 'center' }); } }
+function closeSheet(id){ $(id).classList.remove('open'); if (!document.querySelector('.sheet.open')) document.body.classList.remove('lock'); }
+document.querySelectorAll('.sheet').forEach(sh => sh.addEventListener('click', e => {
+  if (e.target === sh || e.target.closest('[data-close]')) closeSheet(sh.id); }));
 
 function renderBoard(){
   const A = S.mode === 'an', nd = A ? anNode() : null;
@@ -88,17 +127,26 @@ function renderPieces(pos){
 
 /* style settings */
 let prefs = (() => { try { return JSON.parse(localStorage.getItem('openingTrainerStyle') || '{}') } catch(e){ return {} } })();
+const savePrefs = () => { try{ localStorage.setItem('openingTrainerStyle', JSON.stringify(prefs)) }catch(_){} };
+const PIECES = [['classic','Класичні'],['leo','Леопард'],['gems','Самоцвіти'],['fox','Лисиці'],['lynx','Рись'],['panda','Панди'],['wolf','Вовки']];
+const BOARDS = [['wood','Дерево'],['savanna','Савана'],['green','Зелена'],['blue','Сіро-блакитна'],['pearl','Перлова'],['forest','Осінній ліс'],['night','Нічний ліс'],['taiga','Тайга'],['bamboo','Бамбук']];
+const BOARD_FOR = { classic:'wood', leo:'savanna', gems:'pearl', fox:'forest', lynx:'taiga', panda:'bamboo', wolf:'night' };
+$('optPieces').innerHTML = PIECES.map(([k, t]) => `<button class="opt" data-pieces="${k}"><span class="sw-p th-${BOARD_FOR[k]}${k === 'classic' ? '' : ' pt-' + k}"><i class="pc wn"></i><i class="pc bn"></i></span>${t}</button>`).join('');
+$('optBoard').innerHTML = BOARDS.map(([k, t]) => `<button class="opt" data-board="${k}"><span class="sw-b th-${k}"></span>${t}</button>`).join('');
 function applyStyle(){
   const pcs = prefs.pieces || 'classic', th = prefs.board || 'wood';
-  const bd = $('board');
-  bd.className = bd.className.split(' ').filter(c => !/^(th|pt)-/.test(c)).join(' ');
-  bd.classList.add('th-' + th); if (pcs !== 'classic') bd.classList.add('pt-' + pcs);
-  $('selPieces').value = pcs; $('selBoard').value = th; $('selCoach').value = prefs.coach || 'on'; $('coach').hidden = prefs.coach === 'off';
+  ['board', 'lib', 'logo'].forEach(id => { const el = $(id);
+    el.className = el.className.split(' ').filter(c => c && !/^(th|pt)-/.test(c)).join(' ');
+    el.classList.add('th-' + th); if (pcs !== 'classic') el.classList.add('pt-' + pcs); });
+  document.querySelectorAll('[data-pieces]').forEach(b => b.classList.toggle('on', b.dataset.pieces === pcs));
+  document.querySelectorAll('[data-board]').forEach(b => b.classList.toggle('on', b.dataset.board === th));
+  $('optCoach').checked = prefs.coach !== 'off'; $('coach').hidden = prefs.coach === 'off';
 }
-const BOARD_FOR = { classic:'wood', leo:'savanna', gems:'pearl', fox:'forest', lynx:'taiga', panda:'bamboo', wolf:'night' };
-$('selPieces').onchange = e => { prefs.pieces = e.target.value; prefs.board = BOARD_FOR[prefs.pieces]; try{ localStorage.setItem('openingTrainerStyle', JSON.stringify(prefs)) }catch(_){}; applyStyle(); };
-$('selCoach').onchange = e => { prefs.coach = e.target.value; try{ localStorage.setItem('openingTrainerStyle', JSON.stringify(prefs)) }catch(_){}; applyStyle(); };
-$('selBoard').onchange = e => { prefs.board = e.target.value; try{ localStorage.setItem('openingTrainerStyle', JSON.stringify(prefs)) }catch(_){}; applyStyle(); };
+$('settings').addEventListener('click', e => { const b = e.target.closest('.opt'); if (!b) return;
+  if (b.dataset.pieces){ prefs.pieces = b.dataset.pieces; prefs.board = BOARD_FOR[prefs.pieces]; } else prefs.board = b.dataset.board;
+  savePrefs(); applyStyle(); });
+$('optCoach').onchange = e => { prefs.coach = e.target.checked ? 'on' : 'off'; savePrefs(); applyStyle(); };
+$('bSettings').onclick = () => openSheet('settings');
 
 /* ---------- leopard coach: mime only ---------- */
 const Coach = (() => {
@@ -444,11 +492,11 @@ function renderInfo(){
     : O.id === 'morphy' ? `${O.name} · ${Math.ceil(L.san.length/2)} ходів · Морфі грає ${L.side==='w'?'білими':'чорними'} · у тренуванні шукаєш його ходи`
     : O.id === 'minis' ? `${O.name} · ${Math.ceil(L.san.length/2)} ходів · атакують ${L.side==='w'?'білі':'чорні'} · у тренуванні шукаєш їхні ходи`
     : `${O.name} · ${O.eco} · ${Math.ceil(L.san.length/2)} ходів · основна сторона: ${L.side==='w'?'білі':'чорні'}`;
-  $('plan').innerHTML = `<p><span class="lbl">Білі:</span> ${L.plan.w}</p><p><span class="lbl">Чорні:</span> ${L.plan.b}</p>`;
+  $('plan').innerHTML = `<p><span class="lbl"><i class="disc w"></i>Білі:</span> ${L.plan.w}</p><p><span class="lbl"><i class="disc b"></i>Чорні:</span> ${L.plan.b}</p>`;
   $('intro').textContent = O.intro; const mo = O.id === 'morphy' || O.id === 'minis';
   $('hPlan').textContent = mo ? 'Уроки партії' : 'План у мітельшпілі'; $('hIntro').textContent = O.id === 'morphy' ? 'Стиль Морфі' : O.id === 'minis' ? 'Про розділ' : 'Про дебют';
   const p = prog[L.id + (S.mode === 'mg' ? '#mg' : '')];
-  $('stats').textContent = p ? `Пройдено ${p.runs} раз(и), найкращий результат: ${p.best} помил${p.best===1?'ка':'ок'}.` : (S.mode === 'mg' ? 'Мітельшпіль цієї лінії ще не тренували.' : 'Цю лінію ще не тренували.');
+  $('stats').innerHTML = icon('star') + (p ? `Пройдено ${p.runs} ${plural(p.runs, 'раз', 'рази', 'разів')}, найкращий результат: ${p.best === 0 ? 'без помилок' : `${p.best} ${plural(p.best, 'помилка', 'помилки', 'помилок')}`}.` : (S.mode === 'mg' ? 'Мітельшпіль цієї лінії ще не тренували.' : 'Цю лінію ще не тренували.'));
 }
 
 function setMsg(html, err){ const m = $('msg'); m.innerHTML = html; m.classList.toggle('err', !!err); }
@@ -470,7 +518,8 @@ function render(){ const mgB = document.querySelector('#mode button[data-m="mg"]
   if (S.mode === 'view') { $('bPrev').disabled = $('bStart').disabled = S.ply===0; $('bNext').disabled = $('bEnd').disabled = S.ply===line().san.length; }
 }
 
-function stopAuto(){ if (S.auto){ clearInterval(S.auto); S.auto = null; $('bAuto').textContent = 'Авто'; } }
+function setAuto(on){ $('bAuto').innerHTML = icon(on ? 'pause' : 'play') + `<span>${on ? 'Стоп' : 'Авто'}</span>`; }
+function stopAuto(){ if (S.auto){ clearInterval(S.auto); S.auto = null; setAuto(false); } }
 function go(p){ const prev = S.ply; S.ply = Math.max(0, Math.min(line().san.length, p)); render(); viewMsg();
   if (S.mode !== 'view') return;
   if (S.ply === prev + 1) Coach.view(line().san[S.ply - 1]);
@@ -478,7 +527,7 @@ function go(p){ const prev = S.ply; S.ply = Math.max(0, Math.min(line().san.leng
   else if (S.ply !== prev) Coach.idle(); }
 
 function selectLine(op, ln){
-  stopAuto(); clearTimeout(S.mgT); S.op = op; S.ln = ln; S.side = line().side;
+  stopAuto(); clearTimeout(S.mgT); S.op = op; S.ln = ln; S.lib = op; S.side = line().side;
   if (S.mode === 'mg' && !line().mg) S.mode = 'view';
   if (S.mode === 'train') startTrain(); else if (S.mode === 'mg') startMg(); else if (S.mode === 'an') startAn(0); else { S.flip = S.side === 'b'; go(0); }
 }
@@ -584,8 +633,11 @@ function mgFinish(){
 function flash(sq, cls){ S.flash = { sq, cls }; renderBoard(); setTimeout(() => { S.flash = null; renderBoard(); }, 600); }
 
 /* ---------- events ---------- */
-$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) selectLine(+b.dataset.i, 0); });
-$('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) selectLine(S.op, +b.dataset.i); });
+$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b){ S.lib = +b.dataset.i; renderTabs(); } });
+$('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b){ closeSheet('lib'); selectLine(S.lib, +b.dataset.i); } });
+$('lineBar').onclick = () => openSheet('lib');
+$('lnPrev').onclick = () => stepLine(-1);
+$('lnNext').onclick = () => stepLine(1);
 $('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || (b.dataset.m === 'mg' && !line().mg)) return; stopAuto();
   const prevMode = S.mode, L0 = line();
   const entry = prevMode === 'mg' ? (L0.mg && !L0.mg.custom ? L0.san.length + S.ply : L0.san.length) : prevMode === 'an' ? 0 : S.ply;
@@ -612,15 +664,15 @@ $('bFlip').onclick = () => { S.flip = !S.flip; Object.values(pieces).forEach(p =
 $('bAuto').onclick = () => {
   if (S.auto) { stopAuto(); return; }
   if (S.ply >= line().san.length) go(0);
-  $('bAuto').textContent = 'Стоп';
-  S.auto = setInterval(() => { if (S.ply >= line().san.length) { stopAuto(); return; } go(S.ply+1); $('bAuto').textContent = 'Стоп'; }, 1600);
+  setAuto(true);
+  S.auto = setInterval(() => { if (S.ply >= line().san.length) { stopAuto(); return; } go(S.ply+1); }, 1600);
 };
 $('bSide').onclick = () => { S.side = S.side === 'w' ? 'b' : 'w'; startTrain(); };
 $('bHint').onclick = () => { if (S.done || S.busy || turnAt(S.ply) !== S.side || (S.mode === 'mg' && line().mg.kind[S.ply] !== 't')) return; S.hint = Math.min(2, S.hint+1); Coach.hint(S.hint);
   setMsg(S.hint === 1 ? 'Підказка: підсвічено фігуру, якою треба ходити. Ще раз — і покажу поле.' : 'Підказка: показано і фігуру, і поле.'); renderBoard(); };
 $('bRestart').onclick = () => { clearTimeout(S.mgT); S.mode === 'mg' ? startMg() : startTrain(); };
 $('bRandom').onclick = () => { const ls = DATA[S.op].lines; let i = Math.floor(Math.random()*ls.length);
-  if (ls.length > 1 && i === S.ln) i = (i+1) % ls.length; clearTimeout(S.mgT); S.ln = i;
+  if (ls.length > 1 && i === S.ln) i = (i+1) % ls.length; clearTimeout(S.mgT); S.ln = i; S.lib = S.op;
   if (S.mode === 'mg') startMg(); else { S.mode = 'train'; S.side = line().side; startTrain(); } };
 $('aStart').onclick = () => anGo(0);
 $('aPrev').onclick = () => anGo(anNode().p);
@@ -636,8 +688,10 @@ $('aCheck').onclick = () => { if (!engOn()) return; const N = S.an.nodes;
 $('aDel').onclick = anDelete;
 $('aClear').onclick = () => { const b = $('aClear');
   if (b.dataset.arm) { delete b.dataset.arm; b.textContent = 'Очистити все'; anClearAll(); return; }
-  b.dataset.arm = '1'; b.textContent = 'Точно? Натисни ще раз'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Очистити все'; }, 3000); };
+  b.dataset.arm = '1'; b.textContent = 'Точно? Ще раз'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Очистити все'; }, 3000); };
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ document.querySelectorAll('.sheet.open').forEach(x => closeSheet(x.id)); return; }
+  if (document.querySelector('.sheet.open')) return;
   if (S.mode === 'an') { if (e.key === 'ArrowLeft') $('aPrev').click(); else if (e.key === 'ArrowRight') $('aNext').click(); return; }
   if (S.mode !== 'view') return;
   if (e.key === 'ArrowRight') { stopAuto(); go(S.ply+1); } else if (e.key === 'ArrowLeft') { stopAuto(); go(S.ply-1); } });

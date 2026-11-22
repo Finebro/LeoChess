@@ -45,7 +45,11 @@ python3 scripts/build.py --page   # лише перезібрати сторін
 
 - `DATA` — розділи → лінії. Лінія: `id, name, side, plan{w,b}, san[], uci[], fen[], com{ply: текст}`, опційно `mg`.
 - `S` — увесь стан: `op` (розділ), `ln` (лінія), `ply`, `mode` (`view` | `train` | `mg` | `an`), `side`, `flip`, `sel`…
-- Рендер: `render()` → `renderTabs`, `renderBoard` (поля) + `renderPieces` (фігури окремим шаром, плавна анімація),
+- Вибір ліній — «бібліотека» `#lib`: на ширині ≥1180 px це бічна панель, вужче — шторка (`openSheet('lib')`),
+  яку відкриває рядок поточної лінії `#lineBar` (стрілки `stepLine(±1)`). `S.lib` — розділ, відкритий у бібліотеці
+  (вкладка лише гортає розділи, лінію обирає картка). Налаштування вигляду — шторка `#settings`, плитки фігур і дошок.
+  У тестах лінію обирай через `pick(pg, розділ, лінія)` з `tests/conftest_helpers.py`.
+- Рендер: `render()` → `renderTabs` (бібліотека, прогрес у шапці, рядок лінії), `renderBoard` (поля) + `renderPieces` (фігури окремим шаром, плавна анімація),
   `renderMoves`, `renderInfo`, `engPanel`.
 - Режими: перегляд — `go()`, `viewMsg()`; тренування — `startTrain`, `tap`, `afterMove`, `finish`;
   мітельшпіль — `startMg`, `mgNext`, `mgTap`, `mgFinish`; аналіз — `startAn`, `anTap`, `anGo`, дерево `S.an.nodes`.
