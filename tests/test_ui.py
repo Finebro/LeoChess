@@ -27,14 +27,22 @@ with sync_playwright() as p:
     pg.evaluate('selectLine(0,0)')
     for _ in range(sum(len(o['lines']) for o in DATA) - 1):
         pg.click('#lnNext'); s = pg.evaluate(STATE)
-        assert s['lb'] == s['name'] and s['tab'] == s['op'], s
+        assert s['lb'] == s['name'] and s['title'].startswith(s['name']), s
     assert pg.is_disabled('#lnNext')
+    # the closed sheet is rebuilt lazily: on opening it shows the current section and line
+    pg.click('#lineBar'); pg.wait_for_selector('#lib.open #chips', state='visible'); s = pg.evaluate(STATE)
+    assert s['tab'] == s['op'] and pg.evaluate("+document.querySelector('#chips .chip.on').dataset.i") == s['ln'], s
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(350)
     # settings survive a reload
     pg.click('#bSettings'); pg.wait_for_timeout(350); pg.click('[data-pieces="fox"]')
     pg.keyboard.press('Escape'); pg.reload()
     assert 'pt-fox' in pg.get_attribute('#board', 'class') and pg.is_hidden('#coach'), 'settings not saved / leopard should be hidden'
     # fancy pieces are turned into bitmaps (vector «Самоцвіти» made the page stutter)
     pg.wait_for_function("getComputedStyle(document.querySelector('#layer .pc.wq')).backgroundImage.includes('image/png')", timeout=10000)
+    # the compressed Stockfish 19 must really start (not fall back to Stockfish 10 silently)
+    pg.click('#mode button[data-m="an"]')
+    pg.wait_for_function("document.getElementById('evNum').textContent !== '…'", timeout=60000)
+    assert pg.evaluate('Eng.flavour()') == 'wasm', 'Stockfish 19 did not start: ' + pg.evaluate('Eng.flavour()')
     br.close()
     for w in (320, 390):
         br, pg, e2 = open_page(p, width=w)

@@ -1,5 +1,5 @@
 """Generates build/pieces.css: the classic cburnett set plus the themed sets (leopard, gems, fox, lynx, panda, wolf)."""
-import base64, glob, os, random, math, sys
+import base64, glob, json, os, random, math, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 from piece_art import WHITE_FOX, RED_FOX, WHITE_LYNX, DARK_LYNX, PANDA, RED_PANDA, KNIGHT_PANDA, KNIGHT_RED
@@ -127,7 +127,7 @@ THEMES = {
 
 def uri(svg): return 'data:image/svg+xml;base64,' + base64.b64encode(svg.encode()).decode()
 
-css = []
+css, sets = [], {}
 for f in sorted(glob.glob(os.path.join(ROOT, 'assets', 'pieces', 'cburnett', '*.svg'))):
     code = os.path.basename(f)[:2]; svg = open(f).read()
     css.append(f'.pc.{code}{{background-image:url("{uri(svg)}")}}')
@@ -146,7 +146,9 @@ for f in sorted(glob.glob(os.path.join(ROOT, 'assets', 'pieces', 'cburnett', '*.
             s = s.replace('</svg>', (KNIGHT_PANDA if code[0] == 'w' else KNIGHT_RED) + '</svg>')
         if tid == 'lynx' and code[1] == 'n':     # ear tufts on the knight
             s = s.replace('</svg>', TUFTS + '</svg>')
-        css.append(f'.pt-{tid} .pc.{code}{{--img:url("{uri(s)}");background-image:var(--img)}}')
+        sets.setdefault(tid, {})[code] = s
+# the classic set is plain CSS; themed sets go to the page as raw SVG (JSON) and become CSS only when chosen
 os.makedirs(os.path.join(ROOT, 'build'), exist_ok=True)
 open(os.path.join(ROOT, 'build', 'pieces.css'), 'w').write('\n'.join(css))
-print('ok', len(css))
+open(os.path.join(ROOT, 'build', 'pieces.json'), 'w').write(json.dumps(sets, separators=(',', ':'), ensure_ascii=False))
+print('ok', len(css), 'classic +', len(sets), 'themed sets')
