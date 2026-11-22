@@ -10,7 +10,8 @@ def why(pg):
 with sync_playwright() as p:
     br, pg, errs = open_page(p)
     sec = [i for i, o in enumerate(DATA) if o['id'] == 'minis'][0]
-    pick(pg, sec, 0); pg.click('#mode button[data-m="an"]')
+    LI = [i for i, l in enumerate(DATA[sec]['lines']) if l['id'] == 'mini-scotch-nakhmanson'][0]
+    pick(pg, sec, LI); pg.click('#mode button[data-m="an"]')
     for _ in range(3): pg.click('#aNext')
     tap(pg, 'd8', 'g5'); w = why(pg); print('hanging queen:', w); assert 'без захисту' in w
     pg.evaluate('anGo(0)'); tap(pg, 'f2', 'f3'); tap(pg, 'e7', 'e5'); tap(pg, 'g2', 'g4')
@@ -20,7 +21,7 @@ with sync_playwright() as p:
     tap(pg, 'h5', 'h6'); w = why(pg); print('missed mate:', w); assert 'Пропущено мат' in w
     # variations survive a reload
     n = pg.evaluate("S.an.nodes.filter(x=>x&&!x.main).length")
-    pg.reload(); pick(pg, sec, 0); pg.click('#mode button[data-m="an"]')
+    pg.reload(); pick(pg, sec, LI); pg.click('#mode button[data-m="an"]')
     assert pg.evaluate("S.an.nodes.filter(x=>x&&!x.main).length") == n
     assert pg.evaluate('document.documentElement.scrollWidth') <= 390, 'page wider than the phone screen'
     pg.screenshot(path=os.path.join(OUT, 'analysis.png'), full_page=True)
