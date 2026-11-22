@@ -209,6 +209,7 @@ function anBuild(){
   (anStore()[L.id] || []).forEach(path => { let x = 0; for (const u of path){ const y = anPlay(x, u, false); if (y === null) break; x = y; } });
 }
 function startAn(fromPly){
+  stopTimers();
   anBuild(); S.sel = null; S.dests = null; S.done = false; S.busy = false; S.hint = 0;
   S.an.cur = S.an.mainIds[Math.max(0, Math.min(fromPly || 0, S.an.mainIds.length - 1))];
   S.flip = line().side === 'b'; S.showBest = false; Eng.clear(); render(); anMsg(); Coach.idle(); engReq();
@@ -527,13 +528,14 @@ function go(p){ const prev = S.ply; S.ply = Math.max(0, Math.min(line().san.leng
   else if (S.ply !== prev) Coach.idle(); }
 
 function selectLine(op, ln){
-  stopAuto(); clearTimeout(S.mgT); S.op = op; S.ln = ln; S.lib = op; S.side = line().side;
+  stopAuto(); stopTimers(); S.op = op; S.ln = ln; S.lib = op; (S.lastLn = S.lastLn || {})[op] = ln; S.side = line().side;
   if (S.mode === 'mg' && !line().mg) S.mode = 'view';
   if (S.mode === 'train') startTrain(); else if (S.mode === 'mg') startMg(); else if (S.mode === 'an') startAn(0); else { S.flip = S.side === 'b'; go(0); }
 }
 
 /* ---------- training ---------- */
 function startTrain(){
+  stopTimers();
   S.ply = 0; S.lastMine = ''; S.sel = null; S.hint = 0; S.mistakes = 0; S.done = false; S.busy = false; S.flash = null;
   S.flip = S.side === 'b'; render();
   Coach.idle();
@@ -541,9 +543,11 @@ function startTrain(){
   else setMsg(`Твій хід за ${S.side==='w'?'білих':'чорних'}. Зіграй перший хід лінії «${line().name}».`);
 }
 
+/* pending opponent moves / middlegame steps must never leak into another line or mode */
+function stopTimers(){ clearTimeout(S.mgT); clearTimeout(S.oppT); clearTimeout(S.flashT); S.flash = null; S.busy = false; }
 function oppMove(){
   S.busy = true;
-  setTimeout(() => { S.ply++; S.busy = false; afterMove(false); }, 900);
+  clearTimeout(S.oppT); S.oppT = setTimeout(() => { S.ply++; S.busy = false; afterMove(false); }, 900);
 }
 
 function afterMove(mine){
@@ -583,7 +587,7 @@ function tap(n){
 /* ---------- middlegame trainer ---------- */
 function mgLog(html){ S.log.push(html); setMsg(S.log.slice(-3).join('<br>')); }
 function startMg(){
-  const M = line().mg; clearTimeout(S.mgT);
+  const M = line().mg; stopTimers();
   S.ply = 0; S.sel = null; S.hint = 0; S.mistakes = 0; S.done = false; S.busy = true; S.flash = null; S.log = [];
   S.side = M.side; S.flip = M.side === 'b'; render(); Coach.idle();
   const nT = M.kind.filter(k => k === 't').length;
@@ -630,10 +634,11 @@ function mgFinish(){
   mgLog(`<br>${S.mistakes === 0 ? '🎉 План виконано без помилок!' : `План виконано. Помилок: ${S.mistakes}.`} Головна ідея: <b>${M.goal}</b>. Ходи можна переглянути в списку праворуч.`);
 }
 
-function flash(sq, cls){ S.flash = { sq, cls }; renderBoard(); setTimeout(() => { S.flash = null; renderBoard(); }, 600); }
+function flash(sq, cls){ clearTimeout(S.flashT); S.flash = { sq, cls }; renderBoard(); S.flashT = setTimeout(() => { S.flash = null; renderBoard(); }, 600); }
 
 /* ---------- events ---------- */
-$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b){ S.lib = +b.dataset.i; renderTabs(); } });
+$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (!b) return; const i = +b.dataset.i;
+  if (i !== S.op) selectLine(i, (S.lastLn || {})[i] || 0); });
 $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b){ closeSheet('lib'); selectLine(S.lib, +b.dataset.i); } });
 $('lineBar').onclick = () => openSheet('lib');
 $('lnPrev').onclick = () => stepLine(-1);
@@ -644,7 +649,7 @@ $('mode').addEventListener('click', e => { const b = e.target.closest('button');
   if (prevMode === 'an' && b.dataset.m !== 'an'){ let x = anNode(); while (!x.main) x = S.an.nodes[x.p]; S.ply = Math.min(x.d, L0.san.length); }
   if (prevMode === 'an' && b.dataset.m !== 'an') Eng.clear();
   S.mode = b.dataset.m; S.sel = null; S.dests = null;
-  clearTimeout(S.mgT);
+  stopTimers();
   if (S.mode === 'an') { startAn(entry); return; }
   if (S.mode === 'train') { S.side = line().side; startTrain(); }
   else if (S.mode === 'mg') startMg();
@@ -670,9 +675,9 @@ $('bAuto').onclick = () => {
 $('bSide').onclick = () => { S.side = S.side === 'w' ? 'b' : 'w'; startTrain(); };
 $('bHint').onclick = () => { if (S.done || S.busy || turnAt(S.ply) !== S.side || (S.mode === 'mg' && line().mg.kind[S.ply] !== 't')) return; S.hint = Math.min(2, S.hint+1); Coach.hint(S.hint);
   setMsg(S.hint === 1 ? 'Підказка: підсвічено фігуру, якою треба ходити. Ще раз — і покажу поле.' : 'Підказка: показано і фігуру, і поле.'); renderBoard(); };
-$('bRestart').onclick = () => { clearTimeout(S.mgT); S.mode === 'mg' ? startMg() : startTrain(); };
+$('bRestart').onclick = () => { stopTimers(); S.mode === 'mg' ? startMg() : startTrain(); };
 $('bRandom').onclick = () => { const ls = DATA[S.op].lines; let i = Math.floor(Math.random()*ls.length);
-  if (ls.length > 1 && i === S.ln) i = (i+1) % ls.length; clearTimeout(S.mgT); S.ln = i; S.lib = S.op;
+  if (ls.length > 1 && i === S.ln) i = (i+1) % ls.length; stopTimers(); S.ln = i; S.lib = S.op; (S.lastLn = S.lastLn || {})[S.op] = i;
   if (S.mode === 'mg') startMg(); else { S.mode = 'train'; S.side = line().side; startTrain(); } };
 $('aStart').onclick = () => anGo(0);
 $('aPrev').onclick = () => anGo(anNode().p);
