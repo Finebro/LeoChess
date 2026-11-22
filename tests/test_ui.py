@@ -33,6 +33,8 @@ with sync_playwright() as p:
     pg.click('#bSettings'); pg.wait_for_timeout(350); pg.click('[data-pieces="fox"]')
     pg.keyboard.press('Escape'); pg.reload()
     assert 'pt-fox' in pg.get_attribute('#board', 'class') and pg.is_hidden('#coach'), 'settings not saved / leopard should be hidden'
+    # fancy pieces are turned into bitmaps (vector «Самоцвіти» made the page stutter)
+    pg.wait_for_function("getComputedStyle(document.querySelector('#layer .pc.wq')).backgroundImage.includes('image/png')", timeout=10000)
     br.close()
     for w in (320, 390):
         br, pg, e2 = open_page(p, width=w)
