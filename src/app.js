@@ -38,7 +38,7 @@ const WIDE = window.matchMedia('(min-width:1180px)');      // the library is a s
 const libShown = () => WIDE.matches || $('lib').classList.contains('open');
 function renderTabs(force){
   if (S.lib === undefined) S.lib = S.op;
-  const pk = JSON.stringify(prog), hk = [S.op, S.ln, pk].join('|');
+  const pk = JSON.stringify(prog), hk = [S.op, S.ln, pk, S.mode === 'play' && S.pl ? S.pl.id + ':' + S.pl.level : ''].join('|');
   if (hk !== headKey){ headKey = hk; renderHead(); }
   if (!force && !libShown()) { libKey = ''; return; }    // a closed sheet is rebuilt when it opens
   const key = [S.lib, S.op, S.ln, pk].join('|');
@@ -59,7 +59,9 @@ function renderTabs(force){
 function renderHead(){                   // header: overall progress; line bar: current line
   const all = DATA.reduce((a, o) => a + o.lines.length, 0), done = DATA.reduce((a, o) => a + doneIn(o), 0);
   $('progPill').innerHTML = `${icon('star')}${done}/${all} <small>пройдено</small>`;
-  const L = line(), O0 = DATA[S.op]; $('lbSec').textContent = `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`; $('lbName').textContent = L.name;
+  const L = line(), O0 = DATA[S.op], P = S.mode === 'play' && S.pl;
+  $('lbSec').textContent = P ? `Гра з комп'ютером · ти граєш ${sideName(P.side)}` : `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`;
+  $('lbName').textContent = P ? `Рівень ${P.level} «${LEVELS[P.level].name}» (${LEVELS[P.level].elo})` : L.name;
   $('lnPrev').disabled = S.op === 0 && S.ln === 0; $('lnNext').disabled = S.op === DATA.length - 1 && S.ln === DATA[S.op].lines.length - 1;
 }
 function stepLine(d){                    // previous / next line through all sections
@@ -95,11 +97,13 @@ function buildSquares(){
   sqEls = Array.from($('sqs').children, el => ({ el, n: el.dataset.sq, base: el.className }));
 }
 function renderBoard(){
-  const A = S.mode === 'an', nd = A ? anNode() : null;
-  const L = A ? null : cur(); const pos = parseFen(A ? nd.fen.split(' ')[0] : L.fen[S.ply]);
-  const last = A ? (nd.uci || null) : (S.ply > 0 ? L.uci[S.ply-1] : null);
-  const exp = !A && ((S.mode==='train') || (S.mode==='mg' && L.kind[S.ply]==='t')) && S.ply < L.uci.length ? L.uci[S.ply] : null;
-  const best = A && S.showBest ? ((evOf(nd) || {}).pv || [])[0] : null;
+  const P = S.mode === 'play' && S.pl, A = S.mode === 'an' || !!P, nd = S.mode === 'an' ? anNode() : null;
+  const L = A ? null : cur();
+  const pos = parseFen(P ? P.g.fen().split(' ')[0] : nd ? nd.fen.split(' ')[0] : L.fen[S.ply]);
+  const last = P ? (P.ucis[P.ucis.length - 1] || null) : nd ? (nd.uci || null) : (S.ply > 0 ? L.uci[S.ply-1] : null);
+  const exp = P ? P.hint : !A && ((S.mode==='train') || (S.mode==='mg' && L.kind[S.ply]==='t')) && S.ply < L.uci.length ? L.uci[S.ply] : null;
+  if (P) S.hint = P.hint ? 2 : 0;
+  const best = nd && S.showBest ? ((evOf(nd) || {}).pv || [])[0] : null;
   if (!sqEls || sqFlip !== S.flip) buildSquares();
   const mark = {}, add = (n, c) => { if (n) mark[n] = mark[n] ? mark[n] + ' ' + c : c; };
   if (last){ add(last.slice(0,2), 'last'); add(last.slice(2,4), 'last'); }
@@ -532,6 +536,7 @@ Eng.onUpdate((fen, final) => {
 let movesKey = '', infoKey = '';
 function renderMoves(){
   if (S.mode === 'an'){ movesKey = ''; $('moves').innerHTML = anMoves(); return; }
+  if (S.mode === 'play'){ movesKey = ''; $('moves').innerHTML = playMoves(); return; }
   const growing = (S.mode === 'train' || S.mode === 'mg') && !S.done;
   const key = [S.op, S.ln, S.mode, S.done, growing ? S.ply : ''].join('|');
   if (key === movesKey){                 // same list: only the highlighted move changes
@@ -551,6 +556,7 @@ function renderMoves(){
 }
 
 function renderInfo(){
+  if (S.mode === 'play') return playInfo();
   const O = DATA[S.op], L = line();
   const key = [S.op, S.ln, S.mode, JSON.stringify(prog[L.id + (S.mode === 'mg' ? '#mg' : '')] || 0)].join('|');
   if (key === infoKey) return; infoKey = key;
@@ -579,11 +585,12 @@ function viewMsg(){
 }
 
 function render(){ const mgB = document.querySelector('#mode button[data-m="mg"]'); mgB.hidden = !line().mg; $('mode').classList.toggle('three', !line().mg);
-  renderTabs(); renderBoard(); renderMoves(); renderInfo(); engPanel(); $('ctrlView').hidden = S.mode!=='view'; $('ctrlTrain').hidden = S.mode==='view' || S.mode==='an'; $('ctrlAn').hidden = S.mode!=='an'; $('bSide').hidden = S.mode==='mg';
+  renderTabs(); renderBoard(); renderMoves(); renderInfo(); engPanel(); $('ctrlView').hidden = S.mode!=='view'; $('ctrlTrain').hidden = S.mode!=='train' && S.mode!=='mg'; $('ctrlAn').hidden = S.mode!=='an'; $('ctrlPlay').hidden = S.mode!=='play'; $('bSide').hidden = S.mode==='mg';
   $('bSide').textContent = 'Граю за: ' + (S.side==='w'?'білих':'чорних');
   document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === S.mode));
   if (S.mode === 'an') { const n = anNode(); $('aPrev').disabled = $('aStart').disabled = n.p === null; $('aNext').disabled = $('aEnd').disabled = !n.ch.some(c => S.an.nodes[c]);
     $('aDel').disabled = n.main; $('aLine').disabled = n.main; }
+  if (S.mode === 'play') playButtons();
   if (S.mode === 'view') { $('bPrev').disabled = $('bStart').disabled = S.ply===0; $('bNext').disabled = $('bEnd').disabled = S.ply===line().san.length; }
 }
 
@@ -596,6 +603,7 @@ function go(p){ const prev = S.ply; S.ply = Math.max(0, Math.min(line().san.leng
   else if (S.ply !== prev) Coach.idle(); }
 
 function selectLine(op, ln){
+  if (S.mode === 'play'){ leavePlay(); S.mode = 'view'; }
   stopAuto(); stopTimers(); S.op = op; S.ln = ln; S.lib = op; (S.lastLn = S.lastLn || {})[op] = ln; S.side = line().side;
   if (S.mode === 'mg' && !line().mg) S.mode = 'view';
   if (S.mode === 'train') startTrain(); else if (S.mode === 'mg') startMg(); else if (S.mode === 'an') startAn(0); else { S.flip = S.side === 'b'; go(0); }
@@ -637,6 +645,7 @@ function finish(mine, last){
 }
 
 function tap(n){
+  if (S.mode === 'play') return playTap(n);
   if (S.mode === 'an') return anTap(n);
   if (S.mode === 'mg') return mgTap(n);
   if (S.mode !== 'train' || S.done || S.busy) return;
@@ -704,6 +713,233 @@ function mgFinish(){
 
 function flash(sq, cls){ clearTimeout(S.flashT); S.flash = { sq, cls }; renderBoard(); S.flashT = setTimeout(() => { S.flash = null; renderBoard(); }, 600); }
 
+/* ---------- play against the computer ----------
+   Bot: its own Stockfish worker (analysis keeps its cache). Levels 1–8: a search to a limited depth over
+   several candidate moves, a weighted random choice among them (temperature T, in centipawns) and,
+   sometimes, a random legal move — the way real beginners miss things. Strength grows with depth, so the
+   levels are strictly ordered (checked by bot-vs-bot matches). Stockfish's own UCI_Elo was tried and
+   dropped: at quick move times it was weaker than these levels and not monotonic. Level 9 is full strength.
+   The ratings are rough estimates for orientation, not measured against people. */
+const LEVELS = [null,
+  { name: 'Пішак',       elo: '≈400',  depth: 1, mpv: 10, T: 250, rnd: .30 },
+  { name: 'Кінь',        elo: '≈600',  depth: 2, mpv: 8,  T: 150, rnd: .15 },
+  { name: 'Слон',        elo: '≈800',  depth: 3, mpv: 6,  T: 90,  rnd: .08 },
+  { name: 'Тура',        elo: '≈1000', depth: 4, mpv: 5,  T: 65,  rnd: .05 },
+  { name: 'Ферзь',       elo: '≈1200', depth: 6, mpv: 4,  T: 35,  rnd: .025 },
+  { name: 'Король',      elo: '≈1400', depth: 7, mpv: 4,  T: 28,  rnd: .015 },
+  { name: 'Кандидат',    elo: '≈1700', depth: 8, mpv: 3,  T: 20,  rnd: .005 },
+  { name: 'Майстер',     elo: '≈2000', depth: 12, mpv: 2, T: 10,  rnd: 0 },
+  { name: 'Гросмейстер', elo: 'максимум', full: true, ms: 1200 }];
+const Bot = (() => {
+  let w = null, booting = null, flavour = 'none', job = null, chain = Promise.resolve();
+  function boot(){
+    if (w) return Promise.resolve(true);
+    if (booting) return booting;
+    return booting = new Promise(resolve => {
+      const tryOne = (id, next) => {
+        let done = false, wk;
+        const fail = () => { if (done) return; done = true; clearTimeout(t); try { wk.terminate(); } catch(e){} next ? next() : (booting = null, resolve(false)); };
+        const t = setTimeout(fail, 8000);
+        try { wk = new Worker(URL.createObjectURL(new Blob([$(id).textContent], { type: 'text/javascript' }))); } catch(e){ return fail(); }
+        wk.onerror = fail;
+        wk.onmessage = e => { const l = String(e.data);
+          if (l === 'uciok' && !done){ done = true; clearTimeout(t); w = wk; flavour = id === 'sfwasm' ? 'wasm' : 'asm'; booting = null;
+            wk.onmessage = ev => onLine(String(ev.data));
+            wk.onerror = () => { w = null; if (job) job.finish(null); };
+            wk.postMessage('setoption name Hash value 16'); resolve(true); } };
+        wk.postMessage('uci');
+      };
+      tryOne('sfwasm', () => tryOne('sfsrc', null));
+    });
+  }
+  function onLine(l){
+    if (!job) return;
+    if (l.startsWith('info') && l.includes(' pv ') && l.includes(' score ') && !/ (upper|lower)bound/.test(l)){
+      const k = +((l.match(/ multipv (\d+)/) || [0, 1])[1]), m = l.match(/ score (cp|mate) (-?\d+)/);
+      const sc = m[1] === 'cp' ? +m[2] : (+m[2] > 0 ? 20000 - +m[2] : -20000 - +m[2]);
+      job.cands[k] = { uci: l.split(' pv ')[1].trim().split(' ')[0], score: sc };
+    } else if (l.startsWith('bestmove')) job.finish(l.split(' ')[1]);
+  }
+  const uciOf = m => m.from + m.to + (m.promotion || '');
+  function fallback(fen){                    // no engine at all: take the biggest capture, else any move
+    const g = new Chess(fen), ms = g.moves({ verbose: true }); if (!ms.length) return null;
+    const v = { p: 1, n: 3, b: 3, r: 5, q: 9 }; ms.sort((a, b) => (v[b.captured] || 0) - (v[a.captured] || 0));
+    return uciOf(ms[0].captured ? ms[0] : ms[Math.floor(Math.random() * ms.length)]);
+  }
+  function choose(fen, cfg, cands, best){
+    if (!cfg.mpv || !best || best === '(none)') return best;
+    const ms = new Chess(fen).moves({ verbose: true });
+    if (Math.random() < cfg.rnd) return uciOf(ms[Math.floor(Math.random() * ms.length)]);
+    const list = Object.values(cands); if (!list.length) return best;
+    const top = Math.max(...list.map(c => c.score)), ws = list.map(c => Math.exp((c.score - top) / cfg.T));
+    let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < list.length; i++){ r -= ws[i]; if (r <= 0) return list[i].uci; }
+    return best;
+  }
+  function run(fen, cfg){                    // one search; jobs never overlap (see chain)
+    return new Promise(resolve => {
+      const send = c => w.postMessage(c);
+      job = { cands: {}, finish(best){ const j = job; job = null; resolve(best && best !== '(none)' ? choose(fen, cfg, j.cands, best) : null); } };
+      send('setoption name MultiPV value ' + (cfg.mpv || 1));
+      send('position fen ' + fen);
+      send(cfg.mpv ? `go depth ${cfg.depth} movetime 2500` : 'go movetime ' + cfg.ms);   // a slow phone never waits long
+    });
+  }
+  function ask(fen, cfg){
+    const p = chain.then(() => boot()).then(ok => ok && w ? run(fen, cfg) : fallback(fen)).then(u => u || fallback(fen));
+    chain = p.catch(() => {}); return p;
+  }
+  return {
+    move: (fen, level) => ask(fen, LEVELS[level]),
+    best: fen => ask(fen, { full: true, ms: 700 }),
+    cancel(){ if (job && w) w.postMessage('stop'); },
+    flavour: () => flavour,
+  };
+})();
+
+const PLAY_KEY = 'openingTrainerPlay';
+let playSt = (() => { try { return JSON.parse(localStorage.getItem(PLAY_KEY) || '{}') } catch(e){ return {} } })();
+const playSave = () => { try { localStorage.setItem(PLAY_KEY, JSON.stringify(playSt)) } catch(e){} };
+const sideName = (s, gen) => s === 'w' ? (gen ? 'білих' : 'білими') : (gen ? 'чорних' : 'чорними');
+const endFens = {};
+function lineEndFen(){                   // line data keeps only piece placement: replay the moves for a full FEN
+  const L = line(); if (endFens[L.id]) return endFens[L.id];
+  const g = new Chess(); L.uci.forEach(u => g.move({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }));
+  return endFens[L.id] = g.fen();
+}
+const lineEndOk = () => !new Chess(lineEndFen()).game_over();
+
+function openPlay(){
+  const lv = playSt.level || 2, side = playSt.side || 'w', from = playSt.from === 'line' && lineEndOk() ? 'line' : 'start', st = playSt.stats || {};
+  $('optLevel').innerHTML = LEVELS.map((c, i) => !c ? '' : `<button class="lvl${i === lv ? ' on' : ''}" data-level="${i}"><b>${i}</b><span>${c.name}</span><small>${c.elo}</small><em>${st[i] && st[i].w ? '✓ ' + st[i].w : ''}</em></button>`).join('');
+  document.querySelectorAll('#optSide button').forEach(b => b.classList.toggle('on', b.dataset.side === side));
+  document.querySelectorAll('#optFrom button').forEach(b => b.classList.toggle('on', b.dataset.from === from));
+  $('optFromLine').textContent = `З кінця лінії «${line().name}»`; $('optFromLine').disabled = !lineEndOk();
+  const G = playSt.game;
+  $('playResume').innerHTML = G && !G.over ? `<div class="resume"><span><b>Незакінчена гра</b><br>Рівень ${G.level} «${LEVELS[G.level].name}», ${Math.ceil(G.ucis.length / 2)} ${plural(Math.ceil(G.ucis.length / 2), 'хід', 'ходи', 'ходів')}</span><button class="btn sm pri" id="pResume">Продовжити</button></div>` : '';
+  openSheet('play');
+}
+$('play').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.level){ playSt.level = +b.dataset.level; document.querySelectorAll('.lvl').forEach(x => x.classList.toggle('on', x === b)); }
+  else if (b.dataset.side){ playSt.side = b.dataset.side; document.querySelectorAll('#optSide button').forEach(x => x.classList.toggle('on', x === b)); }
+  else if (b.dataset.from && !b.disabled){ playSt.from = b.dataset.from; document.querySelectorAll('#optFrom button').forEach(x => x.classList.toggle('on', x === b)); }
+  else if (b.id === 'pStart'){ closeSheet('play'); newGame(); }
+  else if (b.id === 'pResume'){ closeSheet('play'); startPlay(playSt.game); }
+  playSave();
+});
+$('bPlay').onclick = openPlay;
+
+function newGame(){
+  const level = playSt.level || 2, pick = playSt.side || 'w', side = pick === 'r' ? (Math.random() < .5 ? 'w' : 'b') : pick;
+  const fromLine = playSt.from === 'line' && lineEndOk();
+  startPlay({ id: Date.now(), level, side, fen0: fromLine ? lineEndFen() : new Chess().fen(), from: fromLine ? line().name : '', ucis: [], over: null, counted: false, hints: 0, undos: 0 });
+}
+function startPlay(G){
+  stopAuto(); stopTimers(); if (S.mode === 'an') Eng.clear();
+  const g = new Chess(G.fen0), sans = [];
+  for (const u of G.ucis){ const m = g.move({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }); if (!m) break; sans.push(m.san); }
+  S.mode = 'play'; S.sel = null; S.dests = null; S.flip = G.side === 'b';
+  S.pl = Object.assign(G, { g, sans, hint: null, thinking: false, token: (S.pl && S.pl.token || 0) + 1 });
+  playSt.game = G; playSave(); render();
+  if (!G.over && g.turn() !== G.side) botTurn(); else playMsg();
+}
+function leavePlay(){ if (!S.pl) return; S.pl.token++; S.pl.thinking = false; Bot.cancel(); clearTimeout(S.oppT); }
+function playStore(){ const P = S.pl; playSt.game = { id: P.id, level: P.level, side: P.side, fen0: P.fen0, from: P.from, ucis: P.ucis, over: P.over, counted: P.counted, hints: P.hints, undos: P.undos }; playSave(); }
+function moveLabel(i){ const P = S.pl, f = P.fen0.split(' '), a = (+f[5] - 1) * 2 + (f[1] === 'b' ? 1 : 0) + i; return `${Math.floor(a/2)+1}${a % 2 ? '…' : '.'}`; }
+
+function playTap(sq){
+  const P = S.pl; if (!P || P.over || P.thinking || P.g.turn() !== P.side) return;
+  if (S.sel && S.dests && S.dests[sq]){ const m = S.dests[sq]; playMove({ from: m.from, to: m.to, promotion: 'q' }, true); flash(sq, 'good'); return; }
+  const pc = P.g.get(sq);
+  if (pc && pc.color === P.side && S.sel !== sq){ S.sel = sq; S.dests = {}; P.g.moves({ square: sq, verbose: true }).forEach(m => { S.dests[m.to] = m; }); }
+  else { S.sel = null; S.dests = null; }
+  renderBoard();
+}
+function playMove(mv, mine){
+  const P = S.pl, m = P.g.move(mv); if (!m) return;
+  P.ucis.push(m.from + m.to + (m.promotion || '')); P.sans.push(m.san); P.hint = null; S.sel = null; S.dests = null;
+  checkOver(); playStore(); render();
+  if (P.over) return playMsg();
+  if (mine) botTurn(); else playMsg();
+}
+function botTurn(){
+  const P = S.pl, token = ++P.token, t0 = performance.now(); P.thinking = true; playMsg(); playButtons();
+  Bot.move(P.g.fen(), P.level).then(u => {
+    if (S.mode !== 'play' || S.pl !== P || token !== P.token || !u) return;
+    clearTimeout(S.oppT);
+    S.oppT = setTimeout(() => { if (token !== P.token) return; P.thinking = false;
+      playMove({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }, false); }, Math.max(0, 650 - (performance.now() - t0)));
+  });
+}
+function checkOver(){
+  const P = S.pl, g = P.g; if (P.over) return;
+  if (g.in_checkmate()) P.over = g.turn() === P.side ? 'loss:мат' : 'win:мат';
+  else if (g.in_stalemate()) P.over = 'draw:пат';
+  else if (g.in_threefold_repetition()) P.over = 'draw:троєкратне повторення позиції';
+  else if (g.insufficient_material()) P.over = 'draw:недостатньо фігур для мату';
+  else if (g.in_draw()) P.over = 'draw:правило 50 ходів';
+  if (P.over) countResult();
+}
+function countResult(){
+  const P = S.pl; if (P.counted) return; P.counted = true;
+  const st = (playSt.stats = playSt.stats || {}), r = (st[P.level] = st[P.level] || { w: 0, d: 0, l: 0 });
+  r[P.over[0] === 'w' ? 'w' : P.over[0] === 'd' ? 'd' : 'l']++; playSave();
+}
+function playMsg(){
+  const P = S.pl, g = P.g, n = P.sans.length, last = n ? `<b>${moveLabel(n - 1)} ${P.sans[n - 1]}</b>` : '';
+  if (P.over){
+    const [res, why] = P.over.split(':');
+    const next = res === 'win' && P.level < 9 ? ` Спробуй рівень ${P.level + 1} «${LEVELS[P.level + 1].name}»!` : '';
+    setMsg(res === 'win' ? `🎉 ${last ? last + ' — ' : ''}<b>Перемога!</b> ${why === 'мат' ? 'Мат комп\'ютеру.' : ''}${next}`
+      : res === 'draw' ? `${last ? last + ' — ' : ''}<b>Нічия:</b> ${why}.`
+      : why === 'здача' ? 'Партію здано. Нічого страшного — натисни «Нова гра» і спробуй ще.'
+      : `${last} — <b>мат.</b> Цього разу виграв комп'ютер. Натисни «Хід назад», щоб знайти кращий хід, або «Нова гра».`, res === 'loss');
+    return;
+  }
+  if (P.thinking){ setMsg(`${last ? 'Ти: ' + last + '. ' : ''}Комп'ютер думає…`); return; }
+  const chk = g.in_check() ? ' <b>Шах!</b>' : '';
+  setMsg(n ? `Комп'ютер: ${last}.${chk} Твій хід.` : `Гра почалась: ти граєш ${sideName(P.side)}, рівень ${P.level} «${LEVELS[P.level].name}». Твій хід.`);
+}
+function playButtons(){
+  const P = S.pl; if (!P) return; const mine = !P.over && !P.thinking && P.g.turn() === P.side;
+  $('pUndo').disabled = P.thinking || !P.ucis.length || (P.ucis.length === 1 && P.g.turn() !== P.side && !P.over);
+  $('pHint').disabled = !mine; $('pResign').disabled = !!P.over || !P.ucis.length;
+}
+function playMoves(){
+  const P = S.pl; if (!P || !P.sans.length) return '<span style="color:var(--mut)">Ходи партії зʼявлятимуться тут.</span>';
+  return P.sans.map((s, i) => { const lb = moveLabel(i), num = lb.endsWith('.') || i === 0 ? `<span class="n">${lb}</span>` : '';
+    return `<span class="mv${i === P.sans.length - 1 ? ' cur' : ''}">${num}${s}</span>`; }).join('');
+}
+function playInfo(){
+  const P = S.pl, c = LEVELS[P.level], st = playSt.stats || {};
+  const key = ['play', P.id, P.level, JSON.stringify(st)].join('|'); if (key === infoKey) return; infoKey = key;
+  $('lnTitle').textContent = `Гра з комп'ютером · рівень ${P.level}`;
+  $('lnSub').textContent = `Суперник «${c.name}» (${c.elo}) · ти граєш ${sideName(P.side)}` + (P.from ? ` · з кінця лінії «${P.from}»` : '');
+  $('hPlan').textContent = 'Поради'; $('hIntro').textContent = 'Твої результати';
+  $('plan').innerHTML = '<p>Перед кожним ходом спитай себе: що загрожує мені і що я можу взяти? Не віддавай фігури без захисту.</p>'
+    + '<p>«Підказка» показує найкращий хід, а «Хід назад» дозволяє виправити помилку — так вчитися можна й на поразках.</p>';
+  const rows = LEVELS.map((x, i) => x && st[i] ? `<span>${i}. ${x.name}</span><span class="n">${st[i].w}</span><span class="n">${st[i].d}</span><span class="n">${st[i].l}</span>` : '').join('');
+  $('intro').innerHTML = rows ? `<div class="res-tab"><span class="h">Рівень</span><span class="h n">перемоги</span><span class="h n">нічиї</span><span class="h n">поразки</span>${rows}</div>` : 'Ще жодної завершеної гри. Почни з рівня, на якому виграєш приблизно половину партій.';
+  const r = st[P.level]; $('stats').innerHTML = icon('star') + (r ? `На цьому рівні: ${r.w} ${plural(r.w, 'перемога', 'перемоги', 'перемог')}, ${r.d} ${plural(r.d, 'нічия', 'нічиї', 'нічиїх')}, ${r.l} ${plural(r.l, 'поразка', 'поразки', 'поразок')}.` : 'На цьому рівні ти ще не грав(-ла).');
+}
+$('pNew').onclick = openPlay;
+$('pFlip').onclick = () => { S.flip = !S.flip; Object.values(pieces).forEach(p => p.el.style.setProperty('--dur', '.6s')); renderBoard(); };
+$('pResign').onclick = () => { const P = S.pl; if (!P || P.over) return; leavePlay(); P.thinking = false; P.over = 'loss:здача'; countResult(); playStore(); render(); playMsg(); };
+$('pUndo').onclick = () => {
+  const P = S.pl; if (!P || P.thinking || !P.ucis.length) return;
+  const g = new Chess(P.fen0); let keep = P.ucis.slice(0, -1);
+  if (keep.length){ const t = new Chess(P.fen0); keep.forEach(u => t.move({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }));
+    if (t.turn() !== P.side) keep = keep.slice(0, -1); }          // take back the computer's reply and my move
+  P.undos++; P.over = null; startPlay(Object.assign(P, { ucis: keep }));
+};
+$('pHint').onclick = () => {
+  const P = S.pl; if (!P || P.over || P.thinking || P.g.turn() !== P.side) return;
+  const token = P.token; $('pHint').disabled = true; setMsg('Шукаю найкращий хід…');
+  Bot.best(P.g.fen()).then(u => { if (S.pl !== P || token !== P.token || !u) return; P.hint = u; P.hints++; playStore(); renderBoard(); playButtons();
+    setMsg('Підказка: підсвічено фігуру й поле для найкращого ходу.'); });
+};
+
 /* ---------- events ---------- */
 $('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (!b) return; const i = +b.dataset.i;
   if (i !== S.op) selectLine(i, (S.lastLn || {})[i] || 0); });
@@ -713,6 +949,7 @@ $('lnPrev').onclick = () => stepLine(-1);
 $('lnNext').onclick = () => stepLine(1);
 $('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || (b.dataset.m === 'mg' && !line().mg)) return; stopAuto();
   const prevMode = S.mode, L0 = line();
+  if (prevMode === 'play'){ leavePlay(); S.ply = 0; }
   const entry = prevMode === 'mg' ? (L0.mg && !L0.mg.custom ? L0.san.length + S.ply : L0.san.length) : prevMode === 'an' ? 0 : S.ply;
   if (prevMode === 'an' && b.dataset.m !== 'an'){ let x = anNode(); while (!x.main) x = S.an.nodes[x.p]; S.ply = Math.min(x.d, L0.san.length); }
   if (prevMode === 'an' && b.dataset.m !== 'an') Eng.clear();
@@ -723,7 +960,7 @@ $('mode').addEventListener('click', e => { const b = e.target.closest('button');
   else if (S.mode === 'mg') startMg();
   else { S.side = line().side; S.sel = null; S.hint = 0; S.done = false; S.busy = false; go(Math.min(S.ply, line().san.length)); } });
 $('board').addEventListener('click', e => { const s = e.target.closest('.sq'); if (s) tap(s.dataset.sq); });
-$('moves').addEventListener('click', e => { const m = e.target.closest('.mv');
+$('moves').addEventListener('click', e => { const m = e.target.closest('.mv'); if (S.mode === 'play') return;
   if (m && S.mode === 'an') { anGo(+m.dataset.n); return; }
   if (!m || (S.mode!=='view' && !S.done)) return;
   if (S.mode === 'mg') { S.ply = +m.dataset.p; render(); const i = S.ply - 1; const M = line().mg;

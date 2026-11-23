@@ -44,6 +44,7 @@
   <div class="top-in">
     <div class="brand"><span class="logo" id="logo"><i class="pc wn"></i></span><span class="brand-t"><b>LeoChess</b><small>шаховий тренажер</small></span></div>
     <div class="prog-pill" id="progPill" title="Скільки ліній уже пройдено в тренуванні"></div>
+    <button class="playbtn" id="bPlay" title="Грати з комп'ютером"><svg class="ic"><use href="#i-play"/></svg><span>Грати</span></button>
     <button class="icbtn" id="bSettings" title="Вигляд: фігури, дошка, тренер" aria-label="Налаштування вигляду"><svg class="ic"><use href="#i-sliders"/></svg></button>
   </div>
 </header>
@@ -100,6 +101,13 @@
           <button class="btn sm dng" id="aClear" title="Видалити всі свої варіанти цієї лінії">Очистити все</button>
         </div>
       </div>
+      <div class="ctrl" id="ctrlPlay" hidden>
+        <button class="btn sm" id="pNew"><svg class="ic"><use href="#i-restart"/></svg>Нова гра</button>
+        <button class="btn sm" id="pUndo"><svg class="ic"><use href="#i-back"/></svg>Хід назад</button>
+        <button class="btn sm" id="pHint"><svg class="ic"><use href="#i-bulb"/></svg>Підказка</button>
+        <button class="btn sm dng" id="pResign">Здатися</button>
+        <button class="btn ib" id="pFlip" title="Перевернути дошку" aria-label="Перевернути дошку"><svg class="ic"><use href="#i-flip"/></svg></button>
+      </div>
       <div class="ctrl" id="ctrlTrain" hidden>
         <button class="btn sm" id="bSide">Граю за: білих</button>
         <button class="btn sm" id="bHint"><svg class="ic"><use href="#i-bulb"/></svg>Підказка</button>
@@ -136,6 +144,22 @@
   </div>
 
   <footer class="foot">Підкреслені ходи мають коментар. У тренуванні торкнись фігури, потім поля. Прогрес зберігається лише в цьому браузері.<br>Оцінка позицій: Stockfish 19 lite (stockfish.js, © Chess.com і автори Stockfish, нейромережа Chris Bao, ліцензія GPL v3, github.com/nmrugg/stockfish.js); запасний рушій — Stockfish 10. Правила ходів: chess.js (BSD). Фігури: набір cburnett.</footer>
+</div>
+
+<div class="sheet" id="play" aria-label="Гра з комп'ютером">
+  <div class="sheet-panel">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head"><h2>Гра з комп'ютером</h2><button class="icbtn" data-close="play" aria-label="Закрити"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div id="playResume"></div>
+    <h4>Рівень суперника</h4>
+    <div class="lvls" id="optLevel"></div>
+    <h4>Граю</h4>
+    <div class="seg" id="optSide"><button data-side="w"><i class="disc w"></i>Білими</button><button data-side="r">Випадково</button><button data-side="b"><i class="disc b"></i>Чорними</button></div>
+    <h4>Початок партії</h4>
+    <div class="seg col" id="optFrom"><button data-from="start">Звичайна початкова позиція</button><button data-from="line" id="optFromLine">З кінця лінії</button></div>
+    <button class="btn pri big" id="pStart"><svg class="ic"><use href="#i-play"/></svg>Почати гру</button>
+    <p class="note">Рейтинги рівнів приблизні: так грають шахісти з таким рейтингом. Перші п'ять рівнів навмисно помиляються, як справжні новачки.</p>
+  </div>
 </div>
 
 <div class="sheet" id="settings" aria-label="Вигляд">
