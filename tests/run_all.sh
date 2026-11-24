@@ -9,3 +9,4 @@ python3 test_middlegame.py
 python3 test_analysis.py
 python3 test_ui.py
 python3 test_play.py
+python3 test_puzzles.py

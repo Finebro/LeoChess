@@ -1,0 +1,21 @@
+{
+ "game": {
+  "pgn": "e4 e6 b3 d5 exd5 exd5 Bb2 Nf6 Nf3 Nc6 Be2 Be7 O-O O-O h3 Be6 d3 a5 a4 Rb8 Nbd2 Bd6 Nd4 Nxd4 Bxd4 c5 Bb2 d4 Nc4 Bxc4 bxc4 Bc7 Bf3 Qd6 g3 Rfe8 Bc1 h6 Re1 b6 Bd2 Rxe1+ Qxe1 Re8 Qf1 Qd7 Kg2 g5 Re1 Rxe1 Qxe1 Qxa4"
+ },
+ "puzzle": {
+  "id": "1jwoi",
+  "rating": 1345,
+  "solution": [
+   "e1e7",
+   "a4d7",
+   "e7f6"
+  ],
+  "themes": [
+   "endgame",
+   "short",
+   "crushing",
+   "fork"
+  ],
+  "initialPly": 51
+ }
+}
