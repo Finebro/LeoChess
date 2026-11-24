@@ -809,12 +809,45 @@ function lineEndFen(){                   // line data keeps only piece placement
 }
 const lineEndOk = () => !new Chess(lineEndFen()).game_over();
 
+/* Opening book: the computer can play one of the opening sections (or one line of it) from the start
+   position. While the game follows the section's lines (plus their middlegame continuations) it plays a
+   book move; moves marked ? or ?? (traps for that side) are not played from the book. When the book runs
+   out or the player leaves it, the computer goes on at the chosen level, and the player sees what the
+   lines play in that position. */
+const START_FEN = new Chess().fen();
+const BOOK_SECTIONS = () => DATA.filter(o => o.id !== 'morphy' && o.id !== 'minis');
+const badMark = san => /(\?\?|[^!]\?)$/.test(san);
+function bookLines(B){
+  const O = B && B.sec && DATA.find(o => o.id === B.sec); if (!O) return [];
+  return O.lines.filter(l => !B.line || l.id === B.line).map(l => { const M = l.mg && !l.mg.custom ? l.mg : null;
+    return { name: l.name, uci: l.uci.concat(M ? M.uci : []), san: l.san.concat(M ? M.san : []) }; });
+}
+function bookNext(P, ucis){              // book moves for the position after `ucis` (game from the start only)
+  if (!P.book || !P.book.sec || P.fen0 !== START_FEN) return [];
+  const n = ucis.length;
+  return bookLines(P.book).filter(b => b.uci.length > n && ucis.every((u, i) => b.uci[i].slice(0,4) === u.slice(0,4)))
+    .map(b => ({ uci: b.uci[n], san: b.san[n], name: b.name }));
+}
+const bookName = B => { const O = B && B.sec && DATA.find(o => o.id === B.sec); if (!O) return '';
+  const L = B.line && O.lines.find(l => l.id === B.line); return L ? `${O.name}: ${L.name}` : O.name; };
+function renderBookOpts(){
+  const B = playSt.book || {}, off = playSt.from === 'line' && lineEndOk();
+  $('optBook').innerHTML = `<button data-book=""${!B.sec ? ' class="on"' : ''}>Комп'ютер вирішує сам</button>`
+    + BOOK_SECTIONS().map(o => `<button data-book="${o.id}"${B.sec === o.id ? ' class="on"' : ''}>${o.name}</button>`).join('');
+  const O = B.sec && DATA.find(o => o.id === B.sec);
+  $('optBookLine').innerHTML = !O ? '' : `<button data-bookline=""${!B.line ? ' class="on"' : ''}>Будь-яка лінія</button>`
+    + O.lines.map(l => `<button data-bookline="${l.id}"${B.line === l.id ? ' class="on"' : ''}><i class="disc ${l.side}"></i>${l.name}</button>`).join('');
+  document.querySelectorAll('#optBook button, #optBookLine button').forEach(b => { b.disabled = off; });
+  $('bookNote').textContent = off ? 'Дебют діє, коли партія починається зі звичайної початкової позиції.'
+    : O ? 'Комп\'ютер ходитиме за лініями розділу, поки ти теж граєш за теорією. Далі — сам, на обраному рівні.' : '';
+}
 function openPlay(){
   const lv = playSt.level || 2, side = playSt.side || 'w', from = playSt.from === 'line' && lineEndOk() ? 'line' : 'start', st = playSt.stats || {};
   $('optLevel').innerHTML = LEVELS.map((c, i) => !c ? '' : `<button class="lvl${i === lv ? ' on' : ''}" data-level="${i}"><b>${i}</b><span>${c.name}</span><small>${c.elo}</small><em>${st[i] && st[i].w ? '✓ ' + st[i].w : ''}</em></button>`).join('');
   document.querySelectorAll('#optSide button').forEach(b => b.classList.toggle('on', b.dataset.side === side));
   document.querySelectorAll('#optFrom button').forEach(b => b.classList.toggle('on', b.dataset.from === from));
   $('optFromLine').textContent = `З кінця лінії «${line().name}»`; $('optFromLine').disabled = !lineEndOk();
+  renderBookOpts();
   const G = playSt.game;
   $('playResume').innerHTML = G && !G.over ? `<div class="resume"><span><b>Незакінчена гра</b><br>Рівень ${G.level} «${LEVELS[G.level].name}», ${Math.ceil(G.ucis.length / 2)} ${plural(Math.ceil(G.ucis.length / 2), 'хід', 'ходи', 'ходів')}</span><button class="btn sm pri" id="pResume">Продовжити</button></div>` : '';
   openSheet('play');
@@ -823,7 +856,9 @@ $('play').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.level){ playSt.level = +b.dataset.level; document.querySelectorAll('.lvl').forEach(x => x.classList.toggle('on', x === b)); }
   else if (b.dataset.side){ playSt.side = b.dataset.side; document.querySelectorAll('#optSide button').forEach(x => x.classList.toggle('on', x === b)); }
-  else if (b.dataset.from && !b.disabled){ playSt.from = b.dataset.from; document.querySelectorAll('#optFrom button').forEach(x => x.classList.toggle('on', x === b)); }
+  else if (b.dataset.from && !b.disabled){ playSt.from = b.dataset.from; document.querySelectorAll('#optFrom button').forEach(x => x.classList.toggle('on', x === b)); renderBookOpts(); }
+  else if (b.dataset.book !== undefined && !b.disabled){ playSt.book = { sec: b.dataset.book, line: '' }; renderBookOpts(); }
+  else if (b.dataset.bookline !== undefined && !b.disabled){ playSt.book = Object.assign({}, playSt.book, { line: b.dataset.bookline }); renderBookOpts(); }
   else if (b.id === 'pStart'){ closeSheet('play'); newGame(); }
   else if (b.id === 'pResume'){ closeSheet('play'); startPlay(playSt.game); }
   playSave();
@@ -833,19 +868,20 @@ $('bPlay').onclick = openPlay;
 function newGame(){
   const level = playSt.level || 2, pick = playSt.side || 'w', side = pick === 'r' ? (Math.random() < .5 ? 'w' : 'b') : pick;
   const fromLine = playSt.from === 'line' && lineEndOk();
-  startPlay({ id: Date.now(), level, side, fen0: fromLine ? lineEndFen() : new Chess().fen(), from: fromLine ? line().name : '', ucis: [], over: null, counted: false, hints: 0, undos: 0 });
+  const book = !fromLine && playSt.book && playSt.book.sec ? { sec: playSt.book.sec, line: playSt.book.line || '' } : null;
+  startPlay({ id: Date.now(), level, side, fen0: fromLine ? lineEndFen() : START_FEN, from: fromLine ? line().name : '', book, ucis: [], over: null, counted: false, hints: 0, undos: 0 });
 }
 function startPlay(G){
   stopAuto(); stopTimers(); if (S.mode === 'an') Eng.clear();
   const g = new Chess(G.fen0), sans = [];
   for (const u of G.ucis){ const m = g.move({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }); if (!m) break; sans.push(m.san); }
   S.mode = 'play'; S.sel = null; S.dests = null; S.flip = G.side === 'b';
-  S.pl = Object.assign(G, { g, sans, hint: null, thinking: false, token: (S.pl && S.pl.token || 0) + 1 });
+  S.pl = Object.assign(G, { g, sans, hint: null, thinking: false, note: '', botNote: '', bookDone: false, token: (S.pl && S.pl.token || 0) + 1 });
   playSt.game = G; playSave(); render();
   if (!G.over && g.turn() !== G.side) botTurn(); else playMsg();
 }
 function leavePlay(){ if (!S.pl) return; S.pl.token++; S.pl.thinking = false; Bot.cancel(); clearTimeout(S.oppT); }
-function playStore(){ const P = S.pl; playSt.game = { id: P.id, level: P.level, side: P.side, fen0: P.fen0, from: P.from, ucis: P.ucis, over: P.over, counted: P.counted, hints: P.hints, undos: P.undos }; playSave(); }
+function playStore(){ const P = S.pl; playSt.game = { id: P.id, level: P.level, side: P.side, fen0: P.fen0, from: P.from, book: P.book || null, ucis: P.ucis, over: P.over, counted: P.counted, hints: P.hints, undos: P.undos }; playSave(); }
 function moveLabel(i){ const P = S.pl, f = P.fen0.split(' '), a = (+f[5] - 1) * 2 + (f[1] === 'b' ? 1 : 0) + i; return `${Math.floor(a/2)+1}${a % 2 ? '…' : '.'}`; }
 
 function playTap(sq){
@@ -857,7 +893,14 @@ function playTap(sq){
   renderBoard();
 }
 function playMove(mv, mine){
-  const P = S.pl, m = P.g.move(mv); if (!m) return;
+  const P = S.pl, before = mine ? bookNext(P, P.ucis) : [], m = P.g.move(mv); if (!m) return;
+  P.note = '';
+  if (mine && before.length){
+    const u = m.from + m.to;
+    if (before.some(c => c.uci.slice(0,4) === u)) P.note = '✓ За теорією.';
+    else { const opts = [...new Set(before.map(c => c.san.replace(/[!?]+$/, '')))];
+      P.note = `Ти зійшов(-ла) з теорії «${bookName(P.book)}»: тут у лініях грають ${opts.map(x => moveLabel(P.ucis.length) + ' ' + x).join(' або ')}. Партія продовжується.`; }
+  }
   P.ucis.push(m.from + m.to + (m.promotion || '')); P.sans.push(m.san); P.hint = null; S.sel = null; S.dests = null;
   checkOver(); playStore(); render();
   if (P.over) return playMsg();
@@ -865,11 +908,21 @@ function playMove(mv, mine){
 }
 function botTurn(){
   const P = S.pl, token = ++P.token, t0 = performance.now(); P.thinking = true; playMsg(); playButtons();
-  Bot.move(P.g.fen(), P.level).then(u => {
+  const book = bookNext(P, P.ucis).filter(c => !badMark(c.san));
+  const pickBook = book.length ? book[Math.floor(Math.random() * book.length)] : null;
+  if (pickBook){                         // name a line only once the game belongs to just one of them
+    const names = [...new Set(book.filter(c => c.uci === pickBook.uci).map(c => c.name))];
+    pickBook.label = names.length === 1 ? names[0] : DATA.find(o => o.id === P.book.sec).name; }
+  const stillInBook = bookLines(P.book).some(b => b.uci.length >= P.ucis.length && P.ucis.every((x, i) => b.uci[i].slice(0,4) === x.slice(0,4)));
+  if (P.book && P.book.sec && P.fen0 === START_FEN && !pickBook && !P.bookDone && P.ucis.length && stillInBook){
+    P.bookDone = true; P.botNote = `Дебют «${bookName(P.book)}» закінчився — далі комп'ютер грає сам.`; }
+  (pickBook ? Promise.resolve(pickBook.uci) : Bot.move(P.g.fen(), P.level)).then(u => {
     if (S.mode !== 'play' || S.pl !== P || token !== P.token || !u) return;
     clearTimeout(S.oppT);
     S.oppT = setTimeout(() => { if (token !== P.token) return; P.thinking = false;
-      playMove({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }, false); }, Math.max(0, 650 - (performance.now() - t0)));
+      const note = P.note || '', bn = P.botNote || ''; P.botNote = '';
+      playMove({ from: u.slice(0,2), to: u.slice(2,4), promotion: u[4] || 'q' }, false);
+      P.note = [pickBook ? `За теорією: ${pickBook.label}.` : bn, note].filter(Boolean).join(' '); playMsg(); }, Math.max(0, 650 - (performance.now() - t0)));
   });
 }
 function checkOver(){
@@ -897,9 +950,10 @@ function playMsg(){
       : `${last} — <b>мат.</b> Цього разу виграв комп'ютер. Натисни «Хід назад», щоб знайти кращий хід, або «Нова гра».`, res === 'loss');
     return;
   }
-  if (P.thinking){ setMsg(`${last ? 'Ти: ' + last + '. ' : ''}Комп'ютер думає…`); return; }
-  const chk = g.in_check() ? ' <b>Шах!</b>' : '';
-  setMsg(n ? `Комп'ютер: ${last}.${chk} Твій хід.` : `Гра почалась: ти граєш ${sideName(P.side)}, рівень ${P.level} «${LEVELS[P.level].name}». Твій хід.`);
+  const note = P.note ? `<br><span class="var">${P.note}</span>` : '';
+  if (P.thinking){ setMsg(`${last ? 'Ти: ' + last + '. ' : ''}Комп'ютер думає…${note}`); return; }
+  const chk = g.in_check() ? ' <b>Шах!</b>' : '', bk = P.book && P.book.sec ? ` Дебют комп'ютера: «${bookName(P.book)}».` : '';
+  setMsg(n ? `Комп'ютер: ${last}.${chk} Твій хід.${note}` : `Гра почалась: ти граєш ${sideName(P.side)}, рівень ${P.level} «${LEVELS[P.level].name}».${bk} Твій хід.`);
 }
 function playButtons(){
   const P = S.pl; if (!P) return; const mine = !P.over && !P.thinking && P.g.turn() === P.side;
@@ -915,7 +969,7 @@ function playInfo(){
   const P = S.pl, c = LEVELS[P.level], st = playSt.stats || {};
   const key = ['play', P.id, P.level, JSON.stringify(st)].join('|'); if (key === infoKey) return; infoKey = key;
   $('lnTitle').textContent = `Гра з комп'ютером · рівень ${P.level}`;
-  $('lnSub').textContent = `Суперник «${c.name}» (${c.elo}) · ти граєш ${sideName(P.side)}` + (P.from ? ` · з кінця лінії «${P.from}»` : '');
+  $('lnSub').textContent = `Суперник «${c.name}» (${c.elo}) · ти граєш ${sideName(P.side)}` + (P.from ? ` · з кінця лінії «${P.from}»` : '') + (P.book && P.book.sec ? ` · дебют: ${bookName(P.book)}` : '');
   $('hPlan').textContent = 'Поради'; $('hIntro').textContent = 'Твої результати';
   $('plan').innerHTML = '<p>Перед кожним ходом спитай себе: що загрожує мені і що я можу взяти? Не віддавай фігури без захисту.</p>'
     + '<p>«Підказка» показує найкращий хід, а «Хід назад» дозволяє виправити помилку — так вчитися можна й на поразках.</p>';
@@ -935,7 +989,10 @@ $('pUndo').onclick = () => {
 };
 $('pHint').onclick = () => {
   const P = S.pl; if (!P || P.over || P.thinking || P.g.turn() !== P.side) return;
-  const token = P.token; $('pHint').disabled = true; setMsg('Шукаю найкращий хід…');
+  const token = P.token, theory = bookNext(P, P.ucis).filter(c => !badMark(c.san));
+  if (theory.length){ P.hint = theory[0].uci; P.hints++; playStore(); renderBoard(); playButtons();
+    setMsg(`Підказка за теорією «${bookName(P.book)}»: ${[...new Set(theory.map(c => moveLabel(P.ucis.length) + ' ' + c.san.replace(/[!?]+$/, '')))].join(' або ')}.`); return; }
+  $('pHint').disabled = true; setMsg('Шукаю найкращий хід…');
   Bot.best(P.g.fen()).then(u => { if (S.pl !== P || token !== P.token || !u) return; P.hint = u; P.hints++; playStore(); renderBoard(); playButtons();
     setMsg('Підказка: підсвічено фігуру й поле для найкращого ходу.'); });
 };

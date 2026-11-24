@@ -10,9 +10,11 @@ LEGAL = "S.pl.g.moves({verbose: true}).map(m => m.from + m.to)"
 def my_move(pg, rnd):                    # our moves are reproducible; the bot's are random by design
     mv = rnd.choice(sorted(pg.evaluate(LEGAL))); pg.click(f'.sq[data-sq="{mv[:2]}"]'); pg.click(f'.sq[data-sq="{mv[2:4]}"]')
 
-def start(pg, level, side, frm):
+def start(pg, level, side, frm, book=''):
     pg.click('#bPlay'); pg.wait_for_selector('#play.open .lvl', state='visible')
-    pg.click(f'.lvl[data-level="{level}"]'); pg.click(f'#optSide button[data-side="{side}"]'); pg.click(f'#optFrom button[data-from="{frm}"]'); pg.click('#pStart')
+    pg.click(f'.lvl[data-level="{level}"]'); pg.click(f'#optSide button[data-side="{side}"]'); pg.click(f'#optFrom button[data-from="{frm}"]')
+    if frm == 'start': pg.click(f'#optBook button[data-book="{book}"]')
+    pg.click('#pStart')
 
 with sync_playwright() as p:
     br, pg, errs = open_page(p)
@@ -43,6 +45,15 @@ with sync_playwright() as p:
     assert pg.evaluate('S.pl.thinking') and pg.evaluate("S.pl.fen0.split(' ')[1]") == 'w'
     pg.click('#mode button[data-m="view"]'); pg.wait_for_timeout(2500)
     assert pg.evaluate('S.mode') == 'view' and pg.evaluate('S.pl.ucis.length') == 0, 'computer moved after leaving the game'
+    # opening book: the computer (White) plays the Ruy Lopez; leaving the theory is explained
+    pg.evaluate('selectLine(0, 0)'); start(pg, 1, 'b', 'start', book='ruy')
+    def mine(u): pg.wait_for_function(MY_TURN, timeout=30000); pg.click(f'.sq[data-sq="{u[:2]}"]'); pg.click(f'.sq[data-sq="{u[2:4]}"]')
+    pg.wait_for_function(MY_TURN, timeout=30000); assert pg.evaluate('S.pl.ucis') == ['e2e4']
+    mine('e7e5'); pg.wait_for_function(MY_TURN, timeout=30000); assert pg.evaluate('S.pl.ucis[2]') == 'g1f3'
+    mine('b8c6'); pg.wait_for_function(MY_TURN, timeout=30000); assert pg.evaluate('S.pl.ucis[4]') == 'f1b5', pg.evaluate('S.pl.ucis')
+    pg.click('#pHint'); assert 'за теорією' in pg.inner_text('#msg') and pg.evaluate('S.pl.hint') in ('a7a6', 'g8f6'), pg.inner_text('#msg')
+    mine('h7h6'); pg.wait_for_function(MY_TURN, timeout=30000)
+    assert 'зійшов(-ла) з теорії' in pg.inner_text('#msg'), pg.inner_text('#msg')
     assert pg.evaluate('document.documentElement.scrollWidth') <= 390
     assert not errs, errs
     print('play: passed')
