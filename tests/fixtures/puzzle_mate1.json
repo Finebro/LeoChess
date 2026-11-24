@@ -1,0 +1,19 @@
+{
+ "game": {
+  "pgn": "e4 d6 Nf3 Nf6 Nc3 g6 Bc4 Bg7 O-O O-O d4 Nc6 Be3 e5 dxe5 dxe5 Qxd8 Rxd8 Rad1 Bg4 Bg5 Nd4 Rd3 Bxf3 gxf3 Nxc2 Nd5 Rd6 Nxc7 Rad8 Rxd6 Rxd6 Nb5 Rb6 Nxa7 Rxb2 Bb3 Nd4 Bc1 Re2 Bc4 Rc2 Bb3 Rc3 Bb2 Rxf3 Bxd4 exd4 e5 Ne4 Bd5 Ra3 Nb5 Ra5 Rb1 Nc5 Nxd4 Bxe5 Nf3 Bg7 Bxb7 Nxb7 Rxb7 Bf6 Rb6 Kg7 Nd2 Rxa2 Rd6 Be5 Rd5 f6 Kg2 Kh6 Nf3 Bc7 Rd7 Bb6 Nd2 f5 Kg3 Ra3+ f3 Be3 Nc4 f4+ Kg4 Ra1 Ne5 Rg1+ Kh3 Rb1 Ng4+ Kg5"
+ },
+ "puzzle": {
+  "id": "e9yxp",
+  "rating": 776,
+  "solution": [
+   "d7d5"
+  ],
+  "themes": [
+   "endgame",
+   "epauletteMate",
+   "oneMove",
+   "mateIn1"
+  ],
+  "initialPly": 93
+ }
+}

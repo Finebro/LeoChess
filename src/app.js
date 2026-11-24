@@ -38,7 +38,7 @@ const WIDE = window.matchMedia('(min-width:1180px)');      // the library is a s
 const libShown = () => WIDE.matches || $('lib').classList.contains('open');
 function renderTabs(force){
   if (S.lib === undefined) S.lib = S.op;
-  const pk = JSON.stringify(prog), hk = [S.op, S.ln, pk, S.mode === 'play' && S.pl ? S.pl.id + ':' + S.pl.level : ''].join('|');
+  const pk = JSON.stringify(prog), hk = [S.op, S.ln, pk, S.mode === 'play' && S.pl ? S.pl.id + ':' + S.pl.level : '', S.mode === 'puz' && S.pz ? S.pz.id : ''].join('|');
   if (hk !== headKey){ headKey = hk; renderHead(); }
   if (!force && !libShown()) { libKey = ''; return; }    // a closed sheet is rebuilt when it opens
   const key = [S.lib, S.op, S.ln, pk].join('|');
@@ -60,8 +60,9 @@ function renderHead(){                   // header: overall progress; line bar: 
   const all = DATA.reduce((a, o) => a + o.lines.length, 0), done = DATA.reduce((a, o) => a + doneIn(o), 0);
   $('progPill').innerHTML = `${icon('star')}${done}/${all} <small>пройдено</small>`;
   const L = line(), O0 = DATA[S.op], P = S.mode === 'play' && S.pl;
-  $('lbSec').textContent = P ? `Гра з комп'ютером · ти граєш ${sideName(P.side)}` : `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`;
-  $('lbName').textContent = P ? `Рівень ${P.level} «${LEVELS[P.level].name}» (${LEVELS[P.level].elo})` : L.name;
+  const Z = S.mode === 'puz' && S.pz;
+  $('lbSec').textContent = Z ? 'Шахові задачі · Lichess' : P ? `Гра з комп'ютером · ти граєш ${sideName(P.side)}` : `${O0.name} · за ${L.side==='w'?'білих':'чорних'}`;
+  $('lbName').textContent = Z ? puzLabel() : P ? `Рівень ${P.level} «${LEVELS[P.level].name}» (${LEVELS[P.level].elo})` : L.name;
   $('lnPrev').disabled = S.op === 0 && S.ln === 0; $('lnNext').disabled = S.op === DATA.length - 1 && S.ln === DATA[S.op].lines.length - 1;
 }
 function stepLine(d){                    // previous / next line through all sections
@@ -97,12 +98,12 @@ function buildSquares(){
   sqEls = Array.from($('sqs').children, el => ({ el, n: el.dataset.sq, base: el.className }));
 }
 function renderBoard(){
-  const P = S.mode === 'play' && S.pl, A = S.mode === 'an' || !!P, nd = S.mode === 'an' ? anNode() : null;
+  const P = (S.mode === 'play' && S.pl) || (S.mode === 'puz' && S.pz), A = S.mode === 'an' || !!P, nd = S.mode === 'an' ? anNode() : null;
   const L = A ? null : cur();
   const pos = parseFen(P ? P.g.fen().split(' ')[0] : nd ? nd.fen.split(' ')[0] : L.fen[S.ply]);
   const last = P ? (P.ucis[P.ucis.length - 1] || null) : nd ? (nd.uci || null) : (S.ply > 0 ? L.uci[S.ply-1] : null);
   const exp = P ? P.hint : !A && ((S.mode==='train') || (S.mode==='mg' && L.kind[S.ply]==='t')) && S.ply < L.uci.length ? L.uci[S.ply] : null;
-  if (P) S.hint = P.hint ? 2 : 0;
+  if (P) S.hint = P.hint ? (P.hintLvl || 2) : 0;
   const best = nd && S.showBest ? ((evOf(nd) || {}).pv || [])[0] : null;
   if (!sqEls || sqFlip !== S.flip) buildSquares();
   const mark = {}, add = (n, c) => { if (n) mark[n] = mark[n] ? mark[n] + ' ' + c : c; };
@@ -537,6 +538,7 @@ let movesKey = '', infoKey = '';
 function renderMoves(){
   if (S.mode === 'an'){ movesKey = ''; $('moves').innerHTML = anMoves(); return; }
   if (S.mode === 'play'){ movesKey = ''; $('moves').innerHTML = playMoves(); return; }
+  if (S.mode === 'puz'){ movesKey = ''; $('moves').innerHTML = puzMoves(); return; }
   const growing = (S.mode === 'train' || S.mode === 'mg') && !S.done;
   const key = [S.op, S.ln, S.mode, S.done, growing ? S.ply : ''].join('|');
   if (key === movesKey){                 // same list: only the highlighted move changes
@@ -557,6 +559,7 @@ function renderMoves(){
 
 function renderInfo(){
   if (S.mode === 'play') return playInfo();
+  if (S.mode === 'puz') return puzInfo();
   const O = DATA[S.op], L = line();
   const key = [S.op, S.ln, S.mode, JSON.stringify(prog[L.id + (S.mode === 'mg' ? '#mg' : '')] || 0)].join('|');
   if (key === infoKey) return; infoKey = key;
@@ -585,12 +588,13 @@ function viewMsg(){
 }
 
 function render(){ const mgB = document.querySelector('#mode button[data-m="mg"]'); mgB.hidden = !line().mg; $('mode').classList.toggle('three', !line().mg);
-  renderTabs(); renderBoard(); renderMoves(); renderInfo(); engPanel(); $('ctrlView').hidden = S.mode!=='view'; $('ctrlTrain').hidden = S.mode!=='train' && S.mode!=='mg'; $('ctrlAn').hidden = S.mode!=='an'; $('ctrlPlay').hidden = S.mode!=='play'; $('bSide').hidden = S.mode==='mg';
+  renderTabs(); renderBoard(); renderMoves(); renderInfo(); engPanel(); $('ctrlView').hidden = S.mode!=='view'; $('ctrlTrain').hidden = S.mode!=='train' && S.mode!=='mg'; $('ctrlAn').hidden = S.mode!=='an'; $('ctrlPlay').hidden = S.mode!=='play'; $('ctrlPuz').hidden = S.mode!=='puz'; $('bSide').hidden = S.mode==='mg';
   $('bSide').textContent = 'Граю за: ' + (S.side==='w'?'білих':'чорних');
   document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === S.mode));
   if (S.mode === 'an') { const n = anNode(); $('aPrev').disabled = $('aStart').disabled = n.p === null; $('aNext').disabled = $('aEnd').disabled = !n.ch.some(c => S.an.nodes[c]);
     $('aDel').disabled = n.main; $('aLine').disabled = n.main; }
   if (S.mode === 'play') playButtons();
+  if (S.mode === 'puz') puzButtons();
   if (S.mode === 'view') { $('bPrev').disabled = $('bStart').disabled = S.ply===0; $('bNext').disabled = $('bEnd').disabled = S.ply===line().san.length; }
 }
 
@@ -604,6 +608,7 @@ function go(p){ const prev = S.ply; S.ply = Math.max(0, Math.min(line().san.leng
 
 function selectLine(op, ln){
   if (S.mode === 'play'){ leavePlay(); S.mode = 'view'; }
+  if (S.mode === 'puz'){ leavePuz(); S.mode = 'view'; }
   stopAuto(); stopTimers(); S.op = op; S.ln = ln; S.lib = op; (S.lastLn = S.lastLn || {})[op] = ln; S.side = line().side;
   if (S.mode === 'mg' && !line().mg) S.mode = 'view';
   if (S.mode === 'train') startTrain(); else if (S.mode === 'mg') startMg(); else if (S.mode === 'an') startAn(0); else { S.flip = S.side === 'b'; go(0); }
@@ -646,6 +651,7 @@ function finish(mine, last){
 
 function tap(n){
   if (S.mode === 'play') return playTap(n);
+  if (S.mode === 'puz') return puzTap(n);
   if (S.mode === 'an') return anTap(n);
   if (S.mode === 'mg') return mgTap(n);
   if (S.mode !== 'train' || S.done || S.busy) return;
@@ -997,6 +1003,169 @@ $('pHint').onclick = () => {
     setMsg('Підказка: підсвічено фігуру й поле для найкращого ходу.'); });
 };
 
+/* ---------- puzzles, loaded online from the Lichess puzzle database (CC0) ----------
+   The only part of the page that needs the internet: GET lichess.org/api/puzzle/next (difficulty relative to
+   1500 for anonymous users; `angle` = theme) and /api/puzzle/daily; no account, CORS allowed. One request at a
+   time, the next puzzle is fetched in advance. The puzzle position is the game after its PGN; the last PGN move
+   (the opponent's) is shown first, then the player finds `solution[0]`; replies are played automatically.
+   Any move that gives mate is accepted, as on Lichess. */
+const PUZ_KEY = 'openingTrainerPuzzles';
+let puzSt = (() => { try { return JSON.parse(localStorage.getItem(PUZ_KEY) || '{}') } catch(e){ return {} } })();
+const puzSave = () => { try { localStorage.setItem(PUZ_KEY, JSON.stringify(puzSt)) } catch(e){} };
+const PUZ_DIFF = [['easiest', 'Найлегші', '≈700–1000'], ['easier', 'Легкі', '≈1200–1300'], ['normal', 'Середні', '≈1300–1550'],
+                  ['harder', 'Складні', '≈1550–1700'], ['hardest', 'Найскладніші', '≈1900–2200']];
+const PUZ_THEMES = [['', 'Будь-яка тема'], ['mateIn1', 'Мат в 1 хід'], ['mateIn2', 'Мат у 2 ходи'], ['fork', 'Вилка'], ['pin', 'Зв\'язка'],
+                    ['hangingPiece', 'Незахищена фігура'], ['backRankMate', 'Мат по останній горизонталі'], ['endgame', 'Ендшпіль'], ['opening', 'Дебют']];
+const THEME_UA = { mate: 'Мат', mateIn1: 'Мат в 1 хід', mateIn2: 'Мат у 2 ходи', mateIn3: 'Мат у 3 ходи', mateIn4: 'Мат у 4 ходи', mateIn5: 'Довгий мат',
+  oneMove: 'В один хід', short: 'Коротка', long: 'Довга', veryLong: 'Дуже довга', fork: 'Вилка', pin: 'Зв\'язка', skewer: 'Лінійний удар',
+  hangingPiece: 'Незахищена фігура', discoveredAttack: 'Відкритий напад', doubleCheck: 'Подвійний шах', sacrifice: 'Жертва',
+  deflection: 'Відволікання', attraction: 'Завлікання', interference: 'Перекриття', intermezzo: 'Проміжний хід', trappedPiece: 'Спіймана фігура',
+  capturingDefender: 'Знищення захисника', backRankMate: 'Мат по останній горизонталі', smotheredMate: 'Спертий мат',
+  kingsideAttack: 'Атака на королівському фланзі', queensideAttack: 'Атака на ферзевому фланзі', exposedKing: 'Відкритий король',
+  endgame: 'Ендшпіль', middlegame: 'Мітельшпіль', opening: 'Дебют', advantage: 'Перевага', crushing: 'Вирішальна перевага',
+  equality: 'Зрівняння', defensiveMove: 'Захисний хід', quietMove: 'Тихий хід', zugzwang: 'Цугцванг', promotion: 'Перетворення пішака',
+  underPromotion: 'Слабке перетворення', enPassant: 'Взяття на проході', castling: 'Рокіровка', xRayAttack: 'Рентген',
+  clearance: 'Звільнення лінії', rookEndgame: 'Туровий ендшпіль', pawnEndgame: 'Пішаковий ендшпіль', queenEndgame: 'Ферзевий ендшпіль',
+  bishopEndgame: 'Слоновий ендшпіль', knightEndgame: 'Коневий ендшпіль', queenRookEndgame: 'Ферзь і тура', anastasiaMate: 'Мат Анастасії',
+  arabianMate: 'Арабський мат', hookMate: 'Мат гачком', bodenMate: 'Мат Бодена', doubleBishopMate: 'Мат двома слонами',
+  dovetailMate: 'Мат «ластівчин хвіст»', epauletteMate: 'Мат «еполети»', operaMate: 'Оперний мат', morphysMate: 'Мат Морфі',
+  pillsburysMate: 'Мат Пілсбері', cornerMate: 'Мат у кутку', master: 'Партія майстра' };
+const diffOf = id => PUZ_DIFF.find(d => d[0] === id) || PUZ_DIFF[0];
+const themeOf = id => PUZ_THEMES.find(t => t[0] === id) || PUZ_THEMES[0];
+const puzKey = () => (puzSt.diff || 'easiest') + '|' + (puzSt.theme || '');
+function puzLabel(){ const Z = S.pz; return Z.daily ? 'Задача дня' : `${diffOf(Z.diff)[1]} · ${themeOf(Z.theme)[1]}`; }
+function puzFetch(daily){
+  const url = daily ? 'https://lichess.org/api/puzzle/daily'
+    : `https://lichess.org/api/puzzle/next?difficulty=${puzSt.diff || 'easiest'}${puzSt.theme ? '&angle=' + puzSt.theme : ''}`;
+  return fetch(url, { headers: { Accept: 'application/json' } }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(d => { if (!d || !d.puzzle || !d.game || !d.game.pgn) throw new Error('bad data'); return d; });
+}
+let puzPre = null, puzChain = Promise.resolve();          // requests never overlap
+function puzQueue(daily){ const p = puzChain.then(() => puzFetch(daily)); puzChain = p.catch(() => {}); return p; }
+function prefetchPuz(){ puzPre = { key: puzKey(), p: puzQueue(false) }; puzPre.p.catch(() => { puzPre = null; }); }
+function openPuz(){
+  const d = puzSt.diff || 'easiest', t = puzSt.theme || '';
+  $('optDiff').innerHTML = PUZ_DIFF.map(([k, n, r]) => `<button class="lvl${k === d ? ' on' : ''}" data-diff="${k}"><span>${n}</span><small>${r}</small></button>`).join('');
+  $('optTheme').innerHTML = PUZ_THEMES.map(([k, n]) => `<button data-theme="${k}"${k === t ? ' class="on"' : ''}>${n}</button>`).join('');
+  openSheet('puz');
+}
+$('puz').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.diff){ puzSt.diff = b.dataset.diff; document.querySelectorAll('#optDiff .lvl').forEach(x => x.classList.toggle('on', x === b)); puzSave(); }
+  else if (b.dataset.theme !== undefined){ puzSt.theme = b.dataset.theme; document.querySelectorAll('#optTheme button').forEach(x => x.classList.toggle('on', x === b)); puzSave(); }
+  else if (b.id === 'zStart'){ closeSheet('puz'); nextPuz(false); }
+  else if (b.id === 'zDaily'){ closeSheet('puz'); nextPuz(true); }
+});
+$('bPuz').onclick = openPuz;
+let puzLoading = 0;
+function nextPuz(daily){
+  const ticket = ++puzLoading, seen = new Set(puzSt.seen || []);
+  enterPuzMode(); setMsg('Завантажую задачу з Lichess…'); puzButtons();
+  const get = () => { if (!daily && puzPre && puzPre.key === puzKey()){ const p = puzPre.p; puzPre = null; return p; } return puzQueue(daily); };
+  get().then(d => (!daily && seen.has(d.puzzle.id)) ? puzQueue(false) : d)        // one retry for a puzzle seen before
+    .then(d => { if (ticket !== puzLoading || S.mode !== 'puz') return; startPuz(d, daily); if (!daily) prefetchPuz(); })
+    .catch(() => { if (ticket !== puzLoading || S.mode !== 'puz') return;
+      setMsg('Не вдалося завантажити задачу. Задачі беруться з Lichess, тому потрібен інтернет. Перевір з\'єднання й натисни «Наступна».', true); puzButtons(); });
+}
+function enterPuzMode(){
+  if (S.mode === 'play') leavePlay();
+  stopAuto(); stopTimers(); if (S.mode === 'an') Eng.clear();
+  if (S.mode !== 'puz'){ S.mode = 'puz'; S.sel = null; S.dests = null; if (!S.pz) S.pz = { id: '', g: new Chess(), ucis: [], sans: [], sol: [], themes: [], loading: true, diff: puzSt.diff, theme: puzSt.theme }; render(); }
+}
+function leavePuz(){ puzLoading++; clearTimeout(S.oppT); if (S.pz) S.pz.busy = false; }
+function startPuz(d, daily){
+  const moves = d.game.pgn.split(/\s+/).filter(Boolean), g = new Chess();
+  for (const m of moves.slice(0, -1)) if (!g.move(m)) return setMsg('Задача пошкоджена — натисни «Наступна».', true);
+  const P = S.pz = { id: d.puzzle.id, rating: d.puzzle.rating, themes: d.puzzle.themes || [], sol: d.puzzle.solution, i: 0, g,
+    ucis: [], sans: [], hint: null, hintLvl: 0, failed: false, hinted: false, done: false, busy: true, daily: !!daily,
+    diff: puzSt.diff || 'easiest', theme: daily ? '' : (puzSt.theme || '') };
+  const last = g.move(moves[moves.length - 1]); g.undo();                      // the opponent's move that sets the puzzle
+  P.side = last.color === 'w' ? 'b' : 'w'; S.flip = P.side === 'b'; S.sel = null; S.dests = null;
+  puzSt.seen = (puzSt.seen || []).concat(P.id).slice(-300); puzSave();
+  infoKey = ''; render(); setMsg('Дивись, як походив суперник…'); puzButtons();
+  clearTimeout(S.oppT);
+  S.oppT = setTimeout(() => { if (S.pz !== P) return; const m = g.move(last.san);
+    P.ucis.push(m.from + m.to + (m.promotion || '')); P.busy = false; render();
+    setMsg(`Суперник зіграв <b>${m.san}</b>. Знайди найкращий хід за ${sideName(P.side, true)}!`); puzButtons(); }, 700);
+}
+function puzTap(sq){
+  const P = S.pz; if (!P || !P.sol.length || P.done || P.busy || P.g.turn() !== P.side) return;
+  if (S.sel && S.dests && S.dests[sq]){ const m = S.dests[sq]; puzMove(m.from, m.to, sq); return; }
+  const pc = P.g.get(sq);
+  if (pc && pc.color === P.side && S.sel !== sq){ S.sel = sq; S.dests = {}; P.g.moves({ square: sq, verbose: true }).forEach(m => { S.dests[m.to] = m; }); }
+  else { S.sel = null; S.dests = null; }
+  renderBoard();
+}
+function puzMove(from, to, sq){
+  const P = S.pz, exp = P.sol[P.i], g = P.g;
+  const m = g.move({ from, to, promotion: exp && exp.slice(0,4) === from + to && exp[4] ? exp[4] : 'q' }); if (!m) return;
+  S.sel = null; S.dests = null;
+  if ((m.from + m.to) !== exp.slice(0,4) && !g.in_checkmate()){
+    g.undo(); P.failed = true; flash(sq, 'bad');
+    setMsg('Не той хід. Подумай ще: які шахи, взяття й загрози є в позиції? Або натисни «Підказка».', true); return;
+  }
+  P.ucis.push(m.from + m.to + (m.promotion || '')); P.sans.push(m.san); P.i++; P.hint = null; P.hintLvl = 0;
+  if (g.in_checkmate() || P.i >= P.sol.length){ render(); flash(sq, 'good'); return puzSolved(); }
+  P.busy = true; render(); flash(sq, 'good'); setMsg(`✓ <b>${m.san}</b> — правильно! Суперник відповідає…`); puzButtons();
+  clearTimeout(S.oppT);
+  S.oppT = setTimeout(() => { if (S.pz !== P) return; const r = P.sol[P.i], o = g.move({ from: r.slice(0,2), to: r.slice(2,4), promotion: r[4] });
+    P.ucis.push(r); P.sans.push(o.san); P.i++; P.busy = false; render();
+    setMsg(`Суперник: <b>${o.san}</b>. Продовжуй — знайди наступний хід.`); puzButtons(); }, 650);
+}
+function puzCount(clean){
+  const P = S.pz; if (P.counted) return; P.counted = true;
+  if (clean){ puzSt.solved = (puzSt.solved || 0) + 1; puzSt.streak = (puzSt.streak || 0) + 1; puzSt.best = Math.max(puzSt.best || 0, puzSt.streak); }
+  else { puzSt.failed = (puzSt.failed || 0) + 1; puzSt.streak = 0; }
+  puzSave();
+}
+function puzSolved(){
+  const P = S.pz; P.done = true; const clean = !P.failed && !P.hinted; puzCount(clean);
+  infoKey = ''; render();
+  setMsg(clean ? `🎉 <b>Розв'язано!</b> Рейтинг задачі ${P.rating}. Серія: ${puzSt.streak}. Натисни «Наступна».`
+    : `<b>Розв'язано</b>, але ${P.hinted ? 'з підказкою' : 'не з першої спроби'} — у серію не йде. Рейтинг задачі ${P.rating}. Спробуй наступну!`);
+  puzButtons();
+}
+function puzShowSolution(){
+  const P = S.pz; if (!P || P.done || P.busy || !P.sol.length) return;
+  P.failed = true; P.busy = true; P.hint = null; puzButtons();
+  const step = () => { if (S.pz !== P) return;
+    if (P.i >= P.sol.length){ P.busy = false; P.done = true; puzCount(false); infoKey = ''; render();
+      setMsg(`Ось розв'язок: <b>${P.sans.join(' ')}</b>. Рейтинг задачі ${P.rating}. Наступна вийде краще!`); puzButtons(); return; }
+    const r = P.sol[P.i], m = P.g.move({ from: r.slice(0,2), to: r.slice(2,4), promotion: r[4] });
+    P.ucis.push(r); P.sans.push(m.san); P.i++; render(); S.oppT = setTimeout(step, 750); };
+  step();
+}
+function puzButtons(){
+  const P = S.pz, ready = P && P.sol && P.sol.length && !P.done && !P.busy && P.g.turn() === P.side;
+  $('zHint').disabled = !ready; $('zShow').disabled = !ready;
+  $('zNext').classList.toggle('pri', !P || !P.sol.length || P.done); $('zNext').disabled = false;
+}
+function puzMoves(){
+  const P = S.pz; if (!P || !P.sans.length) return '<span style="color:var(--mut)">Твої ходи в задачі зʼявлятимуться тут.</span>';
+  return P.sans.map((s, i) => `<span class="mv${i === P.sans.length - 1 ? ' cur' : ''}">${s}</span>`).join('');
+}
+function puzInfo(){
+  const P = S.pz, key = ['puz', P.id, P.done, JSON.stringify(puzSt.solved || 0) + (puzSt.failed || 0) + (puzSt.streak || 0)].join('|');
+  if (key === infoKey) return; infoKey = key;
+  const th = P.themes.map(t => THEME_UA[t]).filter(Boolean);
+  $('lnTitle').textContent = P.id ? (P.daily ? 'Задача дня' : 'Задача') + ` · рейтинг ${P.rating}` : 'Шахові задачі';
+  $('lnSub').textContent = !P.id ? 'Задачі з бази Lichess' : P.done ? (th.length ? 'Теми: ' + th.join(', ') : '') : `${puzLabel()} · теми покажу після розв'язку`;
+  $('hPlan').textContent = 'Як розв\'язувати'; $('hIntro').textContent = 'Твої результати';
+  $('plan').innerHTML = '<p>Спершу шукай шахи, потім взяття, потім загрози — у такому порядку. Найсильніший хід часто з них.</p>'
+    + '<p>Неправильний хід не зараховується — можна думати далі. «Підказка» спершу показує фігуру, вдруге — поле.</p>';
+  const ok = puzSt.solved || 0, bad = puzSt.failed || 0;
+  $('intro').innerHTML = ok + bad ? `<div class="res-tab" style="grid-template-columns:repeat(4,auto)"><span class="h">розв'язано</span><span class="h">з помилкою</span><span class="h">серія</span><span class="h">рекорд серії</span>`
+    + `<span class="n">${ok}</span><span class="n">${bad}</span><span class="n">${puzSt.streak || 0}</span><span class="n">${puzSt.best || 0}</span></div>` : 'Ще жодної задачі. Почни з найлегших — і поступово складніше!';
+  $('stats').innerHTML = icon('star') + (P.done && P.id ? `<a class="pz-link" href="https://lichess.org/training/${P.id}" target="_blank" rel="noopener">Відкрити цю задачу на Lichess</a>` : 'Задачі: база Lichess (CC0).');
+}
+$('zNext').onclick = () => nextPuz(false);
+$('zSet').onclick = openPuz;
+$('zShow').onclick = puzShowSolution;
+$('zHint').onclick = () => { const P = S.pz; if (!P || P.done || P.busy || P.g.turn() !== P.side) return;
+  P.hinted = true; P.hint = P.sol[P.i]; P.hintLvl = Math.min(2, (P.hintLvl || 0) + 1); renderBoard();
+  setMsg(P.hintLvl === 1 ? 'Підказка: підсвічено фігуру, якою треба ходити. Ще раз — і покажу поле.' : 'Підказка: показано і фігуру, і поле.'); };
+$('zFlip').onclick = () => { S.flip = !S.flip; Object.values(pieces).forEach(p => p.el.style.setProperty('--dur', '.6s')); renderBoard(); };
+
 /* ---------- events ---------- */
 $('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (!b) return; const i = +b.dataset.i;
   if (i !== S.op) selectLine(i, (S.lastLn || {})[i] || 0); });
@@ -1007,6 +1176,7 @@ $('lnNext').onclick = () => stepLine(1);
 $('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || (b.dataset.m === 'mg' && !line().mg)) return; stopAuto();
   const prevMode = S.mode, L0 = line();
   if (prevMode === 'play'){ leavePlay(); S.ply = 0; }
+  if (prevMode === 'puz'){ leavePuz(); S.ply = 0; }
   const entry = prevMode === 'mg' ? (L0.mg && !L0.mg.custom ? L0.san.length + S.ply : L0.san.length) : prevMode === 'an' ? 0 : S.ply;
   if (prevMode === 'an' && b.dataset.m !== 'an'){ let x = anNode(); while (!x.main) x = S.an.nodes[x.p]; S.ply = Math.min(x.d, L0.san.length); }
   if (prevMode === 'an' && b.dataset.m !== 'an') Eng.clear();
@@ -1017,7 +1187,7 @@ $('mode').addEventListener('click', e => { const b = e.target.closest('button');
   else if (S.mode === 'mg') startMg();
   else { S.side = line().side; S.sel = null; S.hint = 0; S.done = false; S.busy = false; go(Math.min(S.ply, line().san.length)); } });
 $('board').addEventListener('click', e => { const s = e.target.closest('.sq'); if (s) tap(s.dataset.sq); });
-$('moves').addEventListener('click', e => { const m = e.target.closest('.mv'); if (S.mode === 'play') return;
+$('moves').addEventListener('click', e => { const m = e.target.closest('.mv'); if (S.mode === 'play' || S.mode === 'puz') return;
   if (m && S.mode === 'an') { anGo(+m.dataset.n); return; }
   if (!m || (S.mode!=='view' && !S.done)) return;
   if (S.mode === 'mg') { S.ply = +m.dataset.p; render(); const i = S.ply - 1; const M = line().mg;

@@ -354,7 +354,13 @@ h3::after{content:"";flex:1;height:1px;background:var(--line)}
 .playbtn{display:inline-flex;align-items:center;gap:6px;height:42px;padding:0 14px 0 11px;border:0;border-radius:12px;background:var(--acc);color:var(--acc-ink);font-size:14.5px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px -5px color-mix(in srgb,var(--acc) 80%,transparent)}
 .playbtn .ic{width:17px;height:17px}
 .playbtn:hover{filter:brightness(1.07)}
-@media(max-width:374px){.brand-t{display:none}}
+.playbtn.alt{background:var(--gold2);color:var(--gold-ink);box-shadow:none}
+@media(max-width:479px){.brand-t{display:none}}
+@media(max-width:419px){.prog-pill{display:none}}
+#ctrlPuz{display:grid;grid-template-columns:1fr 1fr 46px}
+#zFlip{grid-column:3;grid-row:1/3;height:auto}
+.lvls.five{grid-template-columns:repeat(3,1fr)}
+.pz-link{color:var(--acc);font-weight:700}
 #ctrlPlay{display:grid;grid-template-columns:1fr 1fr 46px}
 #pFlip{grid-column:3;grid-row:1/3;height:auto}
 .lvls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
